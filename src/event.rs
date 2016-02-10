@@ -1,7 +1,15 @@
 use num::FromPrimitive;
 
 pub enum Event {
-    KeyDown(bool, VKeyCode)
+    KeyDown(PressState, VKeyCode)
+}
+
+pub enum PressState {
+    Pressed,
+    /// On windows, additional virtual keypresses are generated after a key has
+    /// been held down for long enough. When that happens, this state is triggered.
+    Held,
+    Released
 }
 
 #[repr(u8)]
