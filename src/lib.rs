@@ -8,3 +8,4 @@ extern crate comdlg32;
 
 pub mod api;
 pub mod event;
+pub mod config;

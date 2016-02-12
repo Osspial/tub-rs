@@ -15,6 +15,7 @@ use std::collections::VecDeque;
 
 use num::FromPrimitive;
 
+use config::WindowConfig;
 use event::{Event, VKeyCode};
 
 pub struct Window {
@@ -23,9 +24,9 @@ pub struct Window {
 }
 
 impl Window {
-    pub fn new<'a>(name: &'a str, config: WindowConfig) -> Window {
+    pub fn new<'a>(name: &'a str, config: &WindowConfig) -> Window {
         Window {
-            internal: InternalWindow::new(name, config),
+            internal: InternalWindow::new(name, config.clone()),
             event_queue: VecDeque::with_capacity(8)
         }
     }
@@ -37,69 +38,6 @@ impl Window {
 
     pub fn hide(&self) {
         self.internal.hide();
-    }
-}
-
-
-pub struct WindowConfig {
-    size_x: i32,
-    size_y: i32,
-    resizable: bool,
-    maximizable: bool,
-    minimizable: bool,
-
-    title_icon: bool
-}
-
-impl WindowConfig {
-    pub fn new() -> WindowConfig {
-        WindowConfig {
-            size_x: 1280,
-            size_y: 720,
-            resizable: true,
-            maximizable: true,
-            minimizable: true,
-
-            title_icon: true
-        }
-    }
-
-    /// Sets the size of windows generated from this config. Defaults to 1280x720.
-    pub fn size(&mut self, x: i32, y: i32) -> &mut WindowConfig {
-        self.size_x = x;
-        self.size_y = y;
-
-        self
-    }
-
-    /// Sets if windows generated from this config are resizable. Defaults to true.
-    pub fn resizable(&mut self, resizable: bool) -> &mut WindowConfig {
-        self.resizable = resizable;
-
-        self
-    }
-
-    /// Sets if windows generated from this config can be maximized. Defaults to true.
-    /// Has no effect if resizable is set to false.
-    pub fn maximizable(&mut self, maximizable: bool) -> &mut WindowConfig {
-        self.maximizable = maximizable;
-
-        self
-    }
-
-    /// Sets if windows generated from this config can be minimized. Defaults to true.
-    pub fn minimizable(&mut self, minimizable: bool) -> &mut WindowConfig {
-        self.minimizable = minimizable;
-
-        self
-    }
-
-    /// Sets if windows generated from this config have an icon on their title bar. Defaults
-    /// to true.
-    pub fn has_title_icon(&mut self, title_icon: bool) -> &mut WindowConfig {
-        self.title_icon = title_icon;
-
-        self
     }
 }
 
