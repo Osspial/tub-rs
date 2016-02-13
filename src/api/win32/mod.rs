@@ -11,7 +11,10 @@ use std::ptr;
 use std::mem;
 use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
-use std::collections::VecDeque;
+use std::path::PathBuf;
+use std::sync::mpsc;
+use std::sync::mpsc::Receiver;
+use std::thread;
 
 use num::FromPrimitive;
 
@@ -20,35 +23,60 @@ use event::{Event, VKeyCode};
 
 pub struct Window {
     internal: InternalWindow,
-    event_queue: VecDeque<Event>
 }
 
 impl Window {
     pub fn new<'a>(name: &'a str, config: &WindowConfig) -> Window {
+        let (sx, rx) = mpsc::channel();
+        let name = name.into();
+        let config = config.clone();
+
+        thread::spawn(move || {
+            unsafe {
+                let internal_window = InternalWindow::new(name, config);
+                sx.send(internal_window).unwrap();
+
+                let mut msg = mem::uninitialized();
+
+                while user32::GetMessageW(&mut msg, ptr::null_mut(), 0, 0) > 0 {
+                    user32::TranslateMessage(&msg);
+                    user32::DispatchMessageW(&msg);
+                }
+            }
+        });
+
         Window {
-            internal: InternalWindow::new(name, config.clone()),
-            event_queue: VecDeque::with_capacity(8)
+            internal: rx.recv().unwrap(),
         }
     }
 
     pub fn show(&self) {
         self.internal.show();
-        self.internal.event_loop();
     }
 
     pub fn hide(&self) {
         self.internal.hide();
     }
+
+    pub fn kill(self) {
+        unsafe {
+            user32::DestroyWindow(self.internal.0);
+        }
+    }
 }
 
+#[derive(Clone)]
 struct InternalWindow( HWND );
 
+unsafe impl Send for InternalWindow {}
+unsafe impl Sync for InternalWindow {}
+
 impl InternalWindow {
-    fn new<'a>(name: &'a str, config: WindowConfig) -> InternalWindow {
+    fn new<'a>(name: String, config: WindowConfig) -> InternalWindow {
         unsafe {
             let class_name = register_window_class();
 
-            let window_name = osstr(name);
+            let window_name = osstr(&name);
 
             let style = {
                 let mut style_temp = 0;
@@ -91,6 +119,27 @@ impl InternalWindow {
                 panic!(format!("Error: {}", ::std::io::Error::last_os_error()));
             }
 
+            if let Some(p) = config.icon {
+                let path = wide_path(p).as_ptr();
+
+                let icon = user32::LoadImageW(ptr::null_mut(), path, winapi::IMAGE_ICON, 32, 32, winapi::LR_LOADFROMFILE);
+                if icon != ptr::null_mut() {
+                    user32::SendMessageW(window_handle, winapi::WM_SETICON, winapi::ICON_BIG as u64, icon as winapi::LPARAM);
+                }
+                else {
+                    panic!("Could not load 32x32 icon (TODO: Make this not panic)");
+                }
+
+                let icon = user32::LoadImageW(ptr::null_mut(), path, winapi::IMAGE_ICON, 16, 16, winapi::LR_LOADFROMFILE);
+                if icon != ptr::null_mut() {
+                    user32::SendMessageW(window_handle, winapi::WM_SETICON, winapi::ICON_SMALL as u64, icon as winapi::LPARAM);
+                }
+                else {
+                    panic!("Could not load 16x16 icon (TODO: Make this not panic)");
+                }
+            }
+
+
             InternalWindow( window_handle )
         }
     }
@@ -106,17 +155,6 @@ impl InternalWindow {
     fn hide(&self) {
         unsafe {
             user32::ShowWindow(self.0, winapi::SW_HIDE);
-        }
-    }
-
-    fn event_loop(&self) {
-        unsafe {
-            let mut msg = mem::uninitialized();
-
-            while user32::GetMessageW(&mut msg, ptr::null_mut(), 0, 0) > 0 {
-                user32::TranslateMessage(&msg);
-                user32::DispatchMessageW(&msg);
-            }
         }
     }
 }
@@ -171,4 +209,8 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
 
 fn osstr<'a>(s: &'a str) -> Vec<u16> {
     OsStr::new(s).encode_wide().chain(Some(0).into_iter()).collect::<Vec<_>>()
+}
+
+fn wide_path(path: PathBuf) -> Vec<u16> {
+    path.as_os_str().encode_wide().chain(Some(0).into_iter()).collect::<Vec<_>>()
 }

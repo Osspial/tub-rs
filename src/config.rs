@@ -1,7 +1,8 @@
 use std::default::Default;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
-pub struct WindowConfig<'a> {
+pub struct WindowConfig {
     /// The window's size in x-coordinates
     pub size_x: i32,
     /// The window's size in y-coordinates
@@ -17,11 +18,11 @@ pub struct WindowConfig<'a> {
     pub title_icon: bool,
 
     /// The path to the window's icon
-    pub icon: &'a str,
+    pub icon: Option<PathBuf>
 }
 
-impl<'a> Default for WindowConfig<'a> {
-    fn default() -> WindowConfig<'a> {
+impl Default for WindowConfig {
+    fn default() -> WindowConfig {
         WindowConfig {
             size_x: 1280,
             size_y: 720,
@@ -31,7 +32,7 @@ impl<'a> Default for WindowConfig<'a> {
 
             title_icon: true,
 
-            icon: ""
+            icon: None
         }
     }
 }

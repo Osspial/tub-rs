@@ -1,1 +1,3 @@
-pub mod win32;
+mod win32;
+
+pub use self::win32::Window;
