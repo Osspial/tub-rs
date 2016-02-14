@@ -34,42 +34,65 @@ impl InternalWindow {
 
             let window_name = osstr(&name);
 
-            let style = {
-                let mut style_temp = 0;
+            let (style, style_ex) = {
+                use config::InitialState::*;
 
-                if config.resizable == true {
-                    style_temp |= winapi::WS_SIZEBOX;
+                let mut style_temp = winapi::WS_SYSMENU;
+                let mut style_ex = 0;
 
-                    if config.maximizable == true {
-                        style_temp |= winapi::WS_MAXIMIZEBOX;
+                if !config.borderless {
+                    if config.resizable {
+                        style_temp |= winapi::WS_SIZEBOX;
+
+                        if config.maximizable {
+                            style_temp |= winapi::WS_MAXIMIZEBOX;
+                        }
                     }
+
+                    if config.minimizable {
+                        style_temp |= winapi::WS_MINIMIZEBOX;
+                    }
+
+                    style_ex |= winapi::WS_EX_WINDOWEDGE;
                 }
 
-                if config.minimizable == true {
-                    style_temp |= winapi::WS_MINIMIZEBOX;
+                if !config.tool_window {
+                    style_ex |= winapi::WS_EX_TOOLWINDOW;
                 }
 
-                if config.title_icon == true {
-                    style_temp |= winapi::WS_SYSMENU;
+                match config.initial_state {
+                    Windowed    => (),
+                    Minimized   => style_temp |= winapi::WS_MINIMIZE,
+                    Maximized   => style_temp |= winapi::WS_MAXIMIZE
                 }
 
-                style_temp
+                (style_temp, style_ex)
             };
 
+            let size =
+                match config.size {
+                    Some(s) => s,
+                    None    => (winapi::CW_USEDEFAULT, winapi::CW_USEDEFAULT)
+                };
+
             let window_handle = user32::CreateWindowExW(
-                winapi::WS_EX_CLIENTEDGE,
+                style_ex,
                 class_name.as_ptr(),
                 window_name.as_ptr() as winapi::LPCWSTR,
                 style,
                 winapi::CW_USEDEFAULT,
                 winapi::CW_USEDEFAULT,
-                config.size_x,
-                config.size_y,
+                size.0,
+                size.1,
                 ptr::null_mut(),
                 ptr::null_mut(),
                 kernel32::GetModuleHandleW(ptr::null()),
                 ptr::null_mut()
             );
+
+            if config.borderless {
+                user32::SetWindowLongW(window_handle, -16, 0);
+            }
 
             if window_handle == ptr::null_mut() {
                 panic!(format!("Error: {}", ::std::io::Error::last_os_error()));
@@ -97,6 +120,13 @@ impl InternalWindow {
 
 
             InternalWindow( window_handle )
+        }
+    }
+
+    pub fn set_title(&self, title: &str) {
+        unsafe {
+            let title = osstr(title);
+            user32::SetWindowTextW(self.0, title.as_ptr());
         }
     }
 

@@ -1,19 +1,23 @@
 extern crate tub;
 
 use tub::api;
-use std::path::{Path};
+use tub::config::{WindowConfig};
+use std::path::Path;
 
 fn main() {
-    let config = tub::config::WindowConfig {
+    let config = WindowConfig {
+        tool_window: false,
         icon: Some(Path::new("tub.ico").to_path_buf()),
         .. Default::default()
     };
 
-    let window = api::Window::new("A Window", &config);
+    let window = api::Window::new("It's a window!", config.clone());
 
     window.show();
 
     loop {
-        window.print_event();
+        for event in window.poll_events() {
+            println!("{:?}", event);
+        }
     }
 }

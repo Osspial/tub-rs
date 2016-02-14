@@ -18,11 +18,10 @@ pub struct Window {
 }
 
 impl Window {
-    pub fn new<'a>(name: &'a str, config: &WindowConfig) -> Window {
+    pub fn new<'a>(name: &'a str, config: WindowConfig) -> Window {
         // Channel for the handle to the window
         let (tx, rx) = mpsc::channel();
         let name = name.into();
-        let config = config.clone();
 
         thread::spawn(move || {
             unsafe {
@@ -52,6 +51,10 @@ impl Window {
         }
     }
 
+    pub fn set_title(&self, title: &str) {
+        self.internal.set_title(title);
+    }
+
     #[inline]
     pub fn show(&self) {
         self.internal.show();
@@ -62,7 +65,39 @@ impl Window {
         self.internal.hide();
     }
 
-    pub fn print_event(&self) {
-        println!("{:?}", self.event_receiver.recv());
+    pub fn poll_events(&self) -> PollEventsIter {
+        PollEventsIter {
+            window: self
+        }
+    }
+
+    pub fn wait_events(&self) -> WaitEventsIter {
+        WaitEventsIter {
+            window: self
+        }
+    }
+}
+
+pub struct PollEventsIter<'w> {
+    window: &'w Window
+}
+
+impl<'w> Iterator for PollEventsIter<'w> {
+    type Item = Event;
+
+    fn next(&mut self) -> Option<Event> {
+        self.window.event_receiver.try_recv().ok()
+    }
+}
+
+pub struct WaitEventsIter<'w> {
+    window: &'w Window
+}
+
+impl<'w> Iterator for WaitEventsIter<'w> {
+    type Item = Event;
+
+    fn next(&mut self) -> Option<Event> {
+        self.window.event_receiver.recv().ok()
     }
 }
