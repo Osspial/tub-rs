@@ -79,6 +79,7 @@ impl Window {
     /// Destroy the window, consuming it in the process
     #[inline]
     pub fn kill(self) {
+        self.hide();
         self.internal.kill();
     }
 }
