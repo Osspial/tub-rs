@@ -9,6 +9,7 @@ use winapi::winuser::WNDCLASSEXW;
 
 use std::ptr;
 use std::mem;
+use std::ops::Drop;
 use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
 use std::path::PathBuf;
@@ -24,7 +25,7 @@ use event::{Event, VKeyCode};
 
 pub struct Window {
     internal: InternalWindow,
-    event_receiver: Receiver<Event>
+    event_receiver: Receiver<Event>,
 }
 
 impl Window {
@@ -73,14 +74,7 @@ impl Window {
     }
 
     pub fn print_event(&self) {
-        println!("{:?}", self.event_receiver.try_recv());
-    }
-
-    /// Destroy the window, consuming it in the process
-    #[inline]
-    pub fn kill(self) {
-        self.hide();
-        self.internal.kill();
+        println!("{:?}", self.event_receiver.recv());
     }
 }
 
@@ -177,11 +171,16 @@ impl InternalWindow {
         }
     }
 
-    #[inline]
-    fn kill(self) {
+    fn kill(&self) {
         unsafe {
-            user32::DestroyWindow(self.0);
+            user32::PostMessageW(self.0, winapi::WM_DESTROY, 0, 0);
         }
+    }
+}
+
+impl Drop for InternalWindow {
+    fn drop(&mut self) {
+        self.kill();
     }
 }
 
@@ -228,7 +227,7 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
     
     match msg {
         winapi::WM_KEYDOWN  => {
-            use event::Event::KeyDown;
+            use event::Event::KeyInput;
             use event::PressState;
 
             let press_state = {
@@ -239,7 +238,19 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
             };
 
             match VKeyCode::from_u64(wparam) {
-                Some(k) => send_event(KeyDown(press_state, k)),
+                Some(k) => send_event(KeyInput(press_state, k)),
+                None    => ()
+            }
+
+            0
+        }
+
+        winapi::WM_KEYUP    => {
+            use event::Event::KeyInput;
+            use event::PressState;
+
+            match VKeyCode::from_u64(wparam) {
+                Some(k) => send_event(KeyInput(PressState::Released, k)),
                 None    => ()
             }
 
@@ -253,6 +264,16 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
             user32::FillRect(hdc, &pstruct.rcPaint, gdi32::CreateSolidBrush(0x000000));
 
             user32::EndPaint(hwnd, &pstruct);
+            0
+        }
+
+        winapi::WM_DESTROY  => {
+            user32::PostQuitMessage(0);
+            0
+        }
+
+        winapi::WM_CLOSE    => {
+            user32::DestroyWindow(hwnd);
             0
         }
 
