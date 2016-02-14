@@ -13,5 +13,7 @@ fn main() {
 
     window.show();
 
-    loop {}
+    loop {
+        window.print_event();
+    }
 }

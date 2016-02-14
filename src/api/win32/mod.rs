@@ -12,8 +12,9 @@ use std::mem;
 use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
 use std::path::PathBuf;
+use std::cell::RefCell;
 use std::sync::mpsc;
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::{Sender, Receiver};
 use std::thread;
 
 use num::FromPrimitive;
@@ -23,18 +24,26 @@ use event::{Event, VKeyCode};
 
 pub struct Window {
     internal: InternalWindow,
+    event_receiver: Receiver<Event>
 }
 
 impl Window {
     pub fn new<'a>(name: &'a str, config: &WindowConfig) -> Window {
-        let (sx, rx) = mpsc::channel();
+        // Channel for the handle to the window
+        let (tx, rx) = mpsc::channel();
         let name = name.into();
         let config = config.clone();
 
         thread::spawn(move || {
             unsafe {
+                // Event channel
+                let (sx, rx) = mpsc::channel();
+                event_sender.with(|sender| {
+                    *sender.borrow_mut() = Some(sx);
+                });
+
                 let internal_window = InternalWindow::new(name, config);
-                sx.send(internal_window).unwrap();
+                tx.send((internal_window, rx)).unwrap();
 
                 let mut msg = mem::uninitialized();
 
@@ -45,23 +54,32 @@ impl Window {
             }
         });
 
+        let (internal_window, reciever) = rx.recv().unwrap();
+
         Window {
-            internal: rx.recv().unwrap(),
+            internal: internal_window,
+            event_receiver: reciever
         }
     }
 
+    #[inline]
     pub fn show(&self) {
         self.internal.show();
     }
 
+    #[inline]
     pub fn hide(&self) {
         self.internal.hide();
     }
 
+    pub fn print_event(&self) {
+        println!("{:?}", self.event_receiver.try_recv());
+    }
+
+    /// Destroy the window, consuming it in the process
+    #[inline]
     pub fn kill(self) {
-        unsafe {
-            user32::DestroyWindow(self.internal.0);
-        }
+        self.internal.kill();
     }
 }
 
@@ -157,6 +175,13 @@ impl InternalWindow {
             user32::ShowWindow(self.0, winapi::SW_HIDE);
         }
     }
+
+    #[inline]
+    fn kill(self) {
+        unsafe {
+            user32::DestroyWindow(self.0);
+        }
+    }
 }
 
 unsafe fn register_window_class() -> Vec<u16> {
@@ -181,13 +206,41 @@ unsafe fn register_window_class() -> Vec<u16> {
     class_name
 }
 
+#[allow(non_upper_case_globals)]
+thread_local!(static event_sender: RefCell<Option<Sender<Event>>> = RefCell::new(None));
+
+fn send_event(event: Event) {
+    event_sender.with(|sender| {
+        let value = sender.borrow();
+        let sender = match *value {
+            Some(ref s) => s,
+            None => return
+        };
+
+        sender.send(event).ok();
+    });
+}
+
 unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
                                    wparam: WPARAM, lparam: LPARAM)
                                    -> winapi::LRESULT {
     
     match msg {
         winapi::WM_KEYDOWN  => {
-            println!("{} {:?}", lparam & 0x40000000, VKeyCode::from_u64(wparam));
+            use event::Event::KeyDown;
+            use event::PressState;
+
+            let press_state = {
+                match lparam & 0x40000000 {
+                    0 => PressState::Pressed,
+                    _ => PressState::Held
+                }
+            };
+
+            match VKeyCode::from_u64(wparam) {
+                Some(k) => send_event(KeyDown(press_state, k)),
+                None    => ()
+            }
 
             0
         }

@@ -1,9 +1,11 @@
 use num::FromPrimitive;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Event {
     KeyDown(PressState, VKeyCode)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PressState {
     Pressed,
     /// On windows, additional virtual keypresses are generated after a key has
