@@ -34,7 +34,7 @@ impl Default for WindowConfig {
             resizable: true,
             maximizable: true,
             minimizable: true,
-            tool_window: true,
+            tool_window: false,
 
             initial_state: InitialState::Windowed,
 

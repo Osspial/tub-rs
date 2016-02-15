@@ -6,7 +6,6 @@ use std::path::Path;
 
 fn main() {
     let config = WindowConfig {
-        tool_window: false,
         icon: Some(Path::new("tub.ico").to_path_buf()),
         .. Default::default()
     };

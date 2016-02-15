@@ -37,36 +37,36 @@ impl InternalWindow {
             let (style, style_ex) = {
                 use config::InitialState::*;
 
-                let mut style_temp = winapi::WS_SYSMENU;
+                let mut style = winapi::WS_SYSMENU;
                 let mut style_ex = 0;
 
-                if !config.borderless {
+                if !config.borderless && !config.tool_window {
                     if config.resizable {
-                        style_temp |= winapi::WS_SIZEBOX;
+                        style |= winapi::WS_SIZEBOX;
 
                         if config.maximizable {
-                            style_temp |= winapi::WS_MAXIMIZEBOX;
+                            style |= winapi::WS_MAXIMIZEBOX;
                         }
                     }
 
                     if config.minimizable {
-                        style_temp |= winapi::WS_MINIMIZEBOX;
+                        style |= winapi::WS_MINIMIZEBOX;
                     }
 
                     style_ex |= winapi::WS_EX_WINDOWEDGE;
                 }
 
-                if !config.tool_window {
+                if config.tool_window {
                     style_ex |= winapi::WS_EX_TOOLWINDOW;
                 }
 
                 match config.initial_state {
                     Windowed    => (),
-                    Minimized   => style_temp |= winapi::WS_MINIMIZE,
-                    Maximized   => style_temp |= winapi::WS_MAXIMIZE
+                    Minimized   => style |= winapi::WS_MINIMIZE,
+                    Maximized   => style |= winapi::WS_MAXIMIZE
                 }
 
-                (style_temp, style_ex)
+                (style, style_ex)
             };
 
             let size =

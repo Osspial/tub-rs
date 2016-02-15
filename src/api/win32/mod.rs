@@ -14,7 +14,7 @@ use event::Event;
 
 pub struct Window {
     internal: InternalWindow,
-    event_receiver: Receiver<Event>,
+    event_receiver: Receiver<Event>
 }
 
 impl Window {
