@@ -85,23 +85,27 @@ impl InternalWindow {
                 winapi::CW_USEDEFAULT,
                 size.0,
                 size.1,
+                // This parameter specifies the window's owner. If the window
+                // is unowned, then it passes a null pointer to the parameter.
                 owner.unwrap_or(ptr::null_mut()),
                 ptr::null_mut(),
                 kernel32::GetModuleHandleW(ptr::null()),
                 ptr::null_mut()
             );
 
-            if config.borderless {
-                user32::SetWindowLongW(window_handle, -16, 0);
-            }
-
             if window_handle == ptr::null_mut() {
                 panic!(format!("Error: {}", ::std::io::Error::last_os_error()));
+            }
+
+            // If the window should be borderless, make it borderless
+            if config.borderless {
+                user32::SetWindowLongW(window_handle, -16, 0);
             }
 
             if let Some(p) = config.icon {
                 let path = wide_path(p).as_ptr();
 
+                // Load the 32x32 icon
                 let icon = user32::LoadImageW(ptr::null_mut(), path, winapi::IMAGE_ICON, 32, 32, winapi::LR_LOADFROMFILE);
                 if icon != ptr::null_mut() {
                     user32::SendMessageW(window_handle, winapi::WM_SETICON, winapi::ICON_BIG as u64, icon as winapi::LPARAM);
@@ -110,6 +114,7 @@ impl InternalWindow {
                     panic!("Could not load 32x32 icon (TODO: Make this not panic)");
                 }
 
+                // Load the 16x16 icon
                 let icon = user32::LoadImageW(ptr::null_mut(), path, winapi::IMAGE_ICON, 16, 16, winapi::LR_LOADFROMFILE);
                 if icon != ptr::null_mut() {
                     user32::SendMessageW(window_handle, winapi::WM_SETICON, winapi::ICON_SMALL as u64, icon as winapi::LPARAM);
@@ -118,25 +123,6 @@ impl InternalWindow {
                     panic!("Could not load 16x16 icon (TODO: Make this not panic)");
                 }
             }
-
-            /*
-            let owned_window = user32::CreateWindowExW(
-                0,
-                class_name.as_ptr(),
-                window_name.as_ptr() as winapi::LPCWSTR,
-                winapi::WS_OVERLAPPEDWINDOW,
-                winapi::CW_USEDEFAULT,
-                winapi::CW_USEDEFAULT,
-                300,
-                300,
-                window_handle,
-                ptr::null_mut(),
-                kernel32::GetModuleHandleW(ptr::null()),
-                ptr::null_mut()
-            );
-
-            user32::ShowWindow(owned_window, winapi::SW_SHOW);
-            */
 
             InternalWindow( window_handle )
         }
@@ -213,7 +199,8 @@ unsafe fn register_window_class() -> Vec<u16> {
     class_name
 }
 
-#[allow(non_upper_case_globals)]
+
+
 thread_local!(pub static CALLBACK_DATA: RefCell<Option<(Vec<CallbackData>, Sender<WindowData>)>> = RefCell::new(None));
 
 pub struct CallbackData {
@@ -237,10 +224,10 @@ pub const MSG_NEWOWNEDWINDOW: UINT = 0xADD;
 
 fn send_event(source: HWND, event: Event) {
     CALLBACK_DATA.with(|data| {
-        let vector = data.borrow();
+        let data = data.borrow();
 
-        let vector = match *vector {
-            Some(ref v) => &v.0,
+        let vector = match *data {
+            Some(ref d) => &d.0,
             None => return
         };
 
@@ -302,6 +289,8 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
             0
         }
 
+        // Currently only draws black.
+        // TODO: Make it actually draw shit
         winapi::WM_PAINT    => {
             let mut pstruct = mem::uninitialized();
             let hdc = user32::BeginPaint(hwnd, &mut pstruct);
@@ -316,6 +305,9 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
             use std::mem::transmute;
             use std::sync::mpsc;
 
+            // For this message, pointers to the name and window config are stored in the
+            // WPARAM and LPARAM parameters, respectively. This turns them into proper pointers
+            // and gets the objects from the pointers.
             let name = (*transmute::<WPARAM, &&str>(wparam)).to_string();
             let config: WindowConfig = transmute::<LPARAM, &WindowConfig>(lparam).clone();
 
@@ -326,6 +318,9 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
                 let mut data = data.borrow_mut();
 
                 {
+                    // This block of code gets a reference to the vector of windows and pushes information
+                    // about new window to the top of the vector
+
                     let mut vector = match *data {
                         Some(ref mut v) => &mut v.0,
                         None            => return
@@ -334,7 +329,7 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
                     vector.push(CallbackData::new(internal_window.0, tx));
                 }
                 
-
+                // Get a reference to the window data sender
                 let sender = match *data {
                     Some(ref r) => &r.1,
                     None        => return
@@ -357,6 +352,8 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
                     None        => return
                 };
 
+                // If this window's information is still in the vector, remove it from
+                // the vector and send the closed message for this window. 
                 match get_window_index(vector, hwnd) {
                     -1  => (),
                     i   => {vector.remove(i as usize).sender.send(Closed).ok();}

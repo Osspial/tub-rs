@@ -76,6 +76,22 @@ impl<'o> Window<'o> {
         }
     }
 
+    /// Creates a window that is owned by the calling window.
+    /// 
+    /// # What is different about an owned window?
+    /// 
+    /// Unowned windows and owned windows are quite similar, but there are a few
+    /// major differences:
+    /// 
+    /// * Owned windows do not appear on the taskbar
+    /// * Owned windows cannot live longer than their owner
+    /// * Owned windows are always drawn in front of their owner
+    /// * Creating an owned window does not create a new thread
+    /// 
+    /// The last point is mostly related to how tub handles windows internally -
+    /// when creating a new unowned window, tub spins up a thread to handle receiving
+    /// input from the window in a way that does not block the main program's execution.
+    /// Owned windows, however, share a thread with their owner. 
     pub fn new_owned_window<'a>(&'o self, name: &'a str, config: WindowConfig) -> Window<'o> {
         use std::mem::transmute;
 
@@ -120,12 +136,19 @@ impl<'o> Window<'o> {
         self.internal.disable();
     }
 
+    /// Get a reference to this window's owner
+    pub fn owner(&self) -> Option<&Window> {
+        self.owner.clone()
+    }
+
+    /// Get a non-blocking iterator over the window's events
     pub fn poll_events(&self) -> PollEventsIter {
         PollEventsIter {
             window: self
         }
     }
 
+    /// Get a blocking iterator over the window's events
     pub fn wait_events(&self) -> WaitEventsIter {
         WaitEventsIter {
             window: self
