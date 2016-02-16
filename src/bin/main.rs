@@ -2,6 +2,7 @@ extern crate tub;
 
 use tub::api;
 use tub::config::{WindowConfig};
+use tub::event::{Event, PressState, VKeyCode};
 use std::path::Path;
 
 fn main() {
@@ -17,18 +18,53 @@ fn main() {
     };
 
     let window = api::Window::new("It's a window!", config.clone());
-    let owned_window = window.new_owned_window("Owned Window", owned_config);
+    window.focus();
+    let mut owned_window: Option<api::Window> = None;
+
+    let mut reset_owned = false;
 
     window.show();
-    owned_window.show();
 
     loop {
         for event in window.poll_events() {
-            println!("Not: {:?}", event);
+            println!("{:?}", event);
+            match event {
+                Event::KeyInput(PressState::Pressed, VKeyCode::D)   => {
+                    match owned_window {
+                        None    => { 
+                            let owned = window.new_owned("Owned Window", owned_config.clone());
+                            owned.show();
+                            owned.owner().unwrap().disable();
+                            owned.focus();
+                            owned_window = Some(owned);
+                        },
+
+                        Some(_) => ()
+                    }
+                }
+
+                _ => ()
+            }
         }
 
-        for event in owned_window.poll_events() {
-            println!("Owned: {:?}", event);
+        if let Some(ref owned) = owned_window {
+            for event in owned.poll_events() {
+                match event {
+                    Event::Closed   => {
+                        owned.owner().unwrap().enable();
+                        owned.owner().unwrap().focus();
+                        reset_owned = true;
+                    }
+
+                    _ => ()
+                }
+                
+            }
+        }
+
+        if reset_owned {
+            owned_window = None;
+            reset_owned = false;
         }
     }
 }

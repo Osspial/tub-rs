@@ -164,6 +164,16 @@ impl InternalWindow {
         }
     }
 
+    #[inline]
+    pub fn focus(&self) {
+        unsafe {
+            // The SetFocus method does not work across threads, but SendMessage does. As
+            // such, this sends a message to the corresponding window where the focus is set
+            // in the callback, which is executed in the correct thread.
+            user32::SendMessageW(self.0, MSG_GAINFOCUS, 0, 0);
+        }
+    }
+
     pub fn kill(&self) {
         unsafe {
             user32::PostMessageW(self.0, winapi::WM_DESTROY, 0, 0);
@@ -221,6 +231,7 @@ impl CallbackData {
 }
 
 pub const MSG_NEWOWNEDWINDOW: UINT = 0xADD;
+pub const MSG_GAINFOCUS: UINT = 71913;
 
 fn send_event(source: HWND, event: Event) {
     CALLBACK_DATA.with(|data| {
@@ -298,6 +309,12 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
             user32::FillRect(hdc, &pstruct.rcPaint, gdi32::CreateSolidBrush(0x000000));
 
             user32::EndPaint(hwnd, &pstruct);
+            0
+        }
+
+        MSG_GAINFOCUS       => {
+            user32::SetFocus(hwnd);
+
             0
         }
 

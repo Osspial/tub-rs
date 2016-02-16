@@ -92,7 +92,7 @@ impl<'o> Window<'o> {
     /// when creating a new unowned window, tub spins up a thread to handle receiving
     /// input from the window in a way that does not block the main program's execution.
     /// Owned windows, however, share a thread with their owner. 
-    pub fn new_owned_window<'a>(&'o self, name: &'a str, config: WindowConfig) -> Window<'o> {
+    pub fn new_owned<'a>(&'o self, name: &'a str, config: WindowConfig) -> Window<'o> {
         use std::mem::transmute;
 
         unsafe {
@@ -136,7 +136,12 @@ impl<'o> Window<'o> {
         self.internal.disable();
     }
 
-    /// Get a reference to this window's owner
+    /// Sets input focus to this window
+    pub fn focus(&self) {
+        self.internal.focus();
+    }
+
+    /// Get a reference to this window's owner, if the window is owned.
     pub fn owner(&self) -> Option<&Window> {
         self.owner.clone()
     }
