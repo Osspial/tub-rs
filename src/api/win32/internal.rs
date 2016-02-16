@@ -22,7 +22,7 @@ use config::WindowConfig;
 use event::{Event, VKeyCode};
 
 #[derive(Clone)]
-pub struct InternalWindow( HWND );
+pub struct InternalWindow( pub HWND );
 
 unsafe impl Send for InternalWindow {}
 unsafe impl Sync for InternalWindow {}
@@ -180,18 +180,53 @@ unsafe fn register_window_class() -> Vec<u16> {
 }
 
 #[allow(non_upper_case_globals)]
-thread_local!(pub static EVENT_SENDER: RefCell<Option<Sender<Event>>> = RefCell::new(None));
+thread_local!(pub static CALLBACK_DATA: RefCell<Option<Vec<CallbackData>>> = RefCell::new(None));
 
-fn send_event(event: Event) {
-    EVENT_SENDER.with(|sender| {
-        let value = sender.borrow();
-        let sender = match *value {
-            Some(ref s) => s,
+pub struct CallbackData {
+    pub window: HWND,
+    pub sender: Sender<Event>
+}
+
+impl CallbackData {
+    #[inline]
+    pub fn new(window: HWND, sender: Sender<Event>) -> CallbackData {
+        CallbackData {
+            window: window,
+            sender: sender
+        }
+    }
+}
+
+fn send_event(source: HWND, event: Event) {
+    CALLBACK_DATA.with(|data| {
+        let vector = data.borrow();
+
+        let vector = match *vector {
+            Some(ref v) => v,
             None => return
         };
 
-        sender.send(event).ok();
+        match get_window_index(vector, source) {
+            -1  => (),
+            i   => {vector[i as usize].sender.send(event).ok();}
+        }
     });
+}
+
+fn get_window_index(vector: &Vec<CallbackData>, window: HWND) -> isize {
+    let mut index = vector.len();
+
+    if index != 0 {
+        while index != 0 {
+            index -= 1;
+
+            if vector[index].window == window {
+                return index as isize;
+            }
+        }
+    }
+
+    -1
 }
 
 unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
@@ -211,7 +246,7 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
             };
 
             match VKeyCode::from_u64(wparam) {
-                Some(k) => send_event(KeyInput(press_state, k)),
+                Some(k) => send_event(hwnd, KeyInput(press_state, k)),
                 None    => ()
             }
 
@@ -223,7 +258,7 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
             use event::PressState;
 
             match VKeyCode::from_u64(wparam) {
-                Some(k) => send_event(KeyInput(PressState::Released, k)),
+                Some(k) => send_event(hwnd, KeyInput(PressState::Released, k)),
                 None    => ()
             }
 
@@ -241,11 +276,22 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
         }
 
         winapi::WM_DESTROY  => {
-            user32::PostQuitMessage(0);
-            0
-        }
+            use event::Event::Closed;
 
-        winapi::WM_CLOSE    => {
+            CALLBACK_DATA.with(|data| {
+                let mut vector = data.borrow_mut();
+
+                let mut vector = match *vector {
+                    Some(ref mut v) => v,
+                    None        => return
+                };
+
+                match get_window_index(vector, hwnd) {
+                    -1  => (),
+                    i   => {vector.remove(i as usize).sender.send(Closed).ok();}
+                }
+            });
+
             user32::DestroyWindow(hwnd);
             0
         }

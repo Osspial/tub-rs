@@ -1,5 +1,5 @@
 mod internal;
-use self::internal::{InternalWindow, EVENT_SENDER};
+use self::internal::{InternalWindow, CallbackData, CALLBACK_DATA};
 
 use user32;
 
@@ -25,13 +25,17 @@ impl Window {
 
         thread::spawn(move || {
             unsafe {
+                let internal_window = InternalWindow::new(name, config);
+
                 // Event channel
                 let (sx, rx) = mpsc::channel();
-                EVENT_SENDER.with(|sender| {
-                    *sender.borrow_mut() = Some(sx);
+                CALLBACK_DATA.with(|sender| {
+                    let mut data_vector = Vec::with_capacity(4);
+                    data_vector.push(CallbackData::new(internal_window.0, sx));
+                    
+                    *sender.borrow_mut() = Some(data_vector);
                 });
 
-                let internal_window = InternalWindow::new(name, config);
                 tx.send((internal_window, rx)).unwrap();
 
                 let mut msg = mem::uninitialized();
@@ -47,7 +51,7 @@ impl Window {
 
         Window {
             internal: internal_window,
-            event_receiver: reciever
+            event_receiver: reciever,
         }
     }
 

@@ -2,7 +2,8 @@ use num::FromPrimitive;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Event {
-    KeyInput(PressState, VKeyCode)
+    KeyInput(PressState, VKeyCode),
+    Closed
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
