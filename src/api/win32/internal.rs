@@ -14,7 +14,7 @@ use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
 use std::path::PathBuf;
 use std::cell::RefCell;
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::{Sender, Receiver};
 
 use num::FromPrimitive;
 
@@ -28,7 +28,8 @@ unsafe impl Send for InternalWindow {}
 unsafe impl Sync for InternalWindow {}
 
 impl InternalWindow {
-    pub fn new<'a>(name: String, config: WindowConfig) -> InternalWindow {
+    #[inline]
+    pub fn new<'a>(name: String, config: WindowConfig, owner: Option<HWND>) -> InternalWindow {
         unsafe {
             let class_name = register_window_class();
 
@@ -84,7 +85,7 @@ impl InternalWindow {
                 winapi::CW_USEDEFAULT,
                 size.0,
                 size.1,
-                ptr::null_mut(),
+                owner.unwrap_or(ptr::null_mut()),
                 ptr::null_mut(),
                 kernel32::GetModuleHandleW(ptr::null()),
                 ptr::null_mut()
@@ -118,11 +119,30 @@ impl InternalWindow {
                 }
             }
 
+            /*
+            let owned_window = user32::CreateWindowExW(
+                0,
+                class_name.as_ptr(),
+                window_name.as_ptr() as winapi::LPCWSTR,
+                winapi::WS_OVERLAPPEDWINDOW,
+                winapi::CW_USEDEFAULT,
+                winapi::CW_USEDEFAULT,
+                300,
+                300,
+                window_handle,
+                ptr::null_mut(),
+                kernel32::GetModuleHandleW(ptr::null()),
+                ptr::null_mut()
+            );
+
+            user32::ShowWindow(owned_window, winapi::SW_SHOW);
+            */
 
             InternalWindow( window_handle )
         }
     }
 
+    #[inline]
     pub fn set_title(&self, title: &str) {
         unsafe {
             let title = osstr(title);
@@ -141,6 +161,20 @@ impl InternalWindow {
     pub fn hide(&self) {
         unsafe {
             user32::ShowWindow(self.0, winapi::SW_HIDE);
+        }
+    }
+
+    #[inline]
+    pub fn enable(&self) {
+        unsafe {
+            user32::EnableWindow(self.0, winapi::TRUE);
+        }
+    }
+
+    #[inline]
+    pub fn disable(&self) {
+        unsafe {
+            user32::EnableWindow(self.0, winapi::FALSE);
         }
     }
 
@@ -180,12 +214,14 @@ unsafe fn register_window_class() -> Vec<u16> {
 }
 
 #[allow(non_upper_case_globals)]
-thread_local!(pub static CALLBACK_DATA: RefCell<Option<Vec<CallbackData>>> = RefCell::new(None));
+thread_local!(pub static CALLBACK_DATA: RefCell<Option<(Vec<CallbackData>, Sender<WindowData>)>> = RefCell::new(None));
 
 pub struct CallbackData {
     pub window: HWND,
     pub sender: Sender<Event>
 }
+
+pub struct WindowData( pub InternalWindow, pub Receiver<Event> );
 
 impl CallbackData {
     #[inline]
@@ -197,12 +233,14 @@ impl CallbackData {
     }
 }
 
+pub const MSG_NEWOWNEDWINDOW: UINT = 0xADD;
+
 fn send_event(source: HWND, event: Event) {
     CALLBACK_DATA.with(|data| {
         let vector = data.borrow();
 
         let vector = match *vector {
-            Some(ref v) => v,
+            Some(ref v) => &v.0,
             None => return
         };
 
@@ -232,7 +270,6 @@ fn get_window_index(vector: &Vec<CallbackData>, window: HWND) -> isize {
 unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
                                    wparam: WPARAM, lparam: LPARAM)
                                    -> winapi::LRESULT {
-    
     match msg {
         winapi::WM_KEYDOWN  => {
             use event::Event::KeyInput;
@@ -275,6 +312,40 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
             0
         }
 
+        MSG_NEWOWNEDWINDOW  => {
+            use std::mem::transmute;
+            use std::sync::mpsc;
+
+            let name = (*transmute::<WPARAM, &&str>(wparam)).to_string();
+            let config: WindowConfig = transmute::<LPARAM, &WindowConfig>(lparam).clone();
+
+            let internal_window = InternalWindow::new(name, config, Some(hwnd));
+            let (tx, rx) = mpsc::channel();
+
+            CALLBACK_DATA.with(|data| {
+                let mut data = data.borrow_mut();
+
+                {
+                    let mut vector = match *data {
+                        Some(ref mut v) => &mut v.0,
+                        None            => return
+                    };
+
+                    vector.push(CallbackData::new(internal_window.0, tx));
+                }
+                
+
+                let sender = match *data {
+                    Some(ref r) => &r.1,
+                    None        => return
+                };
+
+                sender.send(WindowData(internal_window, rx)).ok();
+            });
+
+            0
+        }
+
         winapi::WM_DESTROY  => {
             use event::Event::Closed;
 
@@ -282,7 +353,7 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
                 let mut vector = data.borrow_mut();
 
                 let mut vector = match *vector {
-                    Some(ref mut v) => v,
+                    Some(ref mut v) => &mut v.0,
                     None        => return
                 };
 

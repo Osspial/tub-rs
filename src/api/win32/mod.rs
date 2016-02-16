@@ -1,5 +1,5 @@
 mod internal;
-use self::internal::{InternalWindow, CallbackData, CALLBACK_DATA};
+use self::internal::{InternalWindow, CallbackData, WindowData, CALLBACK_DATA};
 
 use user32;
 
@@ -12,31 +12,50 @@ use std::thread;
 use config::WindowConfig;
 use event::Event;
 
-pub struct Window {
-    internal: InternalWindow,
-    event_receiver: Receiver<Event>
+enum ReceiverTagged<'o> {
+    Owned(Receiver<WindowData>),
+    Borrowed(&'o Receiver<WindowData>)
 }
 
-impl Window {
-    pub fn new<'a>(name: &'a str, config: WindowConfig) -> Window {
+impl<'o> ReceiverTagged<'o> {
+    fn get_ref(&'o self) -> &'o Receiver<WindowData> {
+        use self::ReceiverTagged::*;
+
+        match *self {
+            Owned(ref r)    => r,
+            Borrowed(r)     => r
+        }
+    }
+}
+
+pub struct Window<'o> {
+    internal: InternalWindow,
+    event_receiver: Receiver<Event>,
+    window_receiver: ReceiverTagged<'o>,
+    owner: Option<&'o Window<'o>>
+}
+
+impl<'o> Window<'o> {
+    /// Create a new window with the specified title and config
+    pub fn new<'a>(name: &'a str, config: WindowConfig) -> Window<'o> {
         // Channel for the handle to the window
         let (tx, rx) = mpsc::channel();
         let name = name.into();
 
         thread::spawn(move || {
             unsafe {
-                let internal_window = InternalWindow::new(name, config);
+                let internal_window = InternalWindow::new(name, config, None);
 
                 // Event channel
                 let (sx, rx) = mpsc::channel();
+
                 CALLBACK_DATA.with(|sender| {
                     let mut data_vector = Vec::with_capacity(4);
                     data_vector.push(CallbackData::new(internal_window.0, sx));
-                    
-                    *sender.borrow_mut() = Some(data_vector);
-                });
 
-                tx.send((internal_window, rx)).unwrap();
+                    tx.send(WindowData(internal_window, rx)).unwrap();
+                    *sender.borrow_mut() = Some((data_vector, tx));
+                });
 
                 let mut msg = mem::uninitialized();
 
@@ -47,11 +66,30 @@ impl Window {
             }
         });
 
-        let (internal_window, reciever) = rx.recv().unwrap();
+        let WindowData(internal_window, receiver) = rx.recv().unwrap();
 
         Window {
             internal: internal_window,
-            event_receiver: reciever,
+            event_receiver: receiver,
+            window_receiver: ReceiverTagged::Owned(rx),
+            owner: None
+        }
+    }
+
+    pub fn new_owned_window<'a>(&'o self, name: &'a str, config: WindowConfig) -> Window<'o> {
+        use std::mem::transmute;
+
+        unsafe {
+            user32::SendMessageW(self.internal.0, internal::MSG_NEWOWNEDWINDOW, transmute(&name), transmute(&config));
+
+            let win_data = self.window_receiver.get_ref().recv().unwrap();
+
+            Window {
+                internal: win_data.0,
+                event_receiver: win_data.1,
+                window_receiver: ReceiverTagged::Borrowed(self.window_receiver.get_ref()),
+                owner: Some(self)
+            }
         }
     }
 
@@ -69,6 +107,19 @@ impl Window {
         self.internal.hide();
     }
 
+    /// Allow the window to take user input. Any newly created window defaults to
+    /// being enabled.
+    #[inline]
+    pub fn enable(&self) {
+        self.internal.enable();
+    }
+
+    /// Disallow the window from taking user input.
+    #[inline]
+    pub fn disable(&self) {
+        self.internal.disable();
+    }
+
     pub fn poll_events(&self) -> PollEventsIter {
         PollEventsIter {
             window: self
@@ -83,7 +134,7 @@ impl Window {
 }
 
 pub struct PollEventsIter<'w> {
-    window: &'w Window
+    window: &'w Window<'w>
 }
 
 impl<'w> Iterator for PollEventsIter<'w> {
@@ -95,7 +146,7 @@ impl<'w> Iterator for PollEventsIter<'w> {
 }
 
 pub struct WaitEventsIter<'w> {
-    window: &'w Window
+    window: &'w Window<'w>
 }
 
 impl<'w> Iterator for WaitEventsIter<'w> {
