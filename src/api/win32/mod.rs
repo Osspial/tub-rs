@@ -141,6 +141,15 @@ impl<'o> Window<'o> {
         self.internal.focus();
     }
 
+    /// Gets the position of the upper-left corner of the window, including the title bar
+    pub fn get_position(&self) -> Option<(i32, i32)> {
+        self.internal.get_position()
+    }
+
+    pub fn get_inner_size(&self) -> (u32, u32) {
+        self.internal.get_inner_size()
+    }
+
     /// Get a reference to this window's owner, if the window is owned.
     pub fn owner(&self) -> Option<&Window> {
         self.owner.clone()

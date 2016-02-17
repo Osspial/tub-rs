@@ -42,6 +42,8 @@ impl InternalWindow {
                 let mut style_ex = 0;
 
                 if !config.borderless && !config.tool_window {
+                    style |= winapi::WS_CAPTION;
+                    
                     if config.resizable {
                         style |= winapi::WS_SIZEBOX;
 
@@ -69,12 +71,23 @@ impl InternalWindow {
 
                 (style, style_ex)
             };
+            
 
-            let size =
-                match config.size {
-                    Some(s) => s,
-                    None    => (winapi::CW_USEDEFAULT, winapi::CW_USEDEFAULT)
-                };
+            let size = match config.size {
+                Some(s) => {
+                    let mut size_rect = winapi::RECT {
+                        left: 0,
+                        top: 0,
+                        right: s.0,
+                        bottom: s.1
+                    };
+
+                    user32::AdjustWindowRectEx(&mut size_rect, style, 0, style_ex);
+                    (size_rect.right - size_rect.left, size_rect.bottom - size_rect.top)
+                }
+
+                None => (winapi::CW_USEDEFAULT, winapi::CW_USEDEFAULT)
+            };
 
             let window_handle = user32::CreateWindowExW(
                 style_ex,
@@ -172,6 +185,39 @@ impl InternalWindow {
             // in the callback, which is executed in the correct thread.
             user32::SendMessageW(self.0, MSG_GAINFOCUS, 0, 0);
         }
+    }
+
+    #[inline]
+    pub fn get_position(&self) -> Option<(i32, i32)> {
+        unsafe {
+            let mut rect = mem::uninitialized();
+
+            match user32::GetWindowRect(self.0, &mut rect) {
+                0 => None,
+                _ => Some((rect.left as i32, rect.top as i32))
+            }
+        }
+    }
+
+    #[inline]
+    pub fn get_inner_size(&self) -> (u32, u32) {
+        /*
+        unsafe {
+            let mut rect = mem::uninitialized();
+            user32::GetClientRect(self.0, &mut rect);
+
+            ((rect.right - rect.left) as u32, (rect.bottom - rect.top) as u32)
+        }
+        */
+
+        let mut rect: winapi::RECT = unsafe { mem::uninitialized() };
+
+        unsafe{ user32::GetClientRect(self.0, &mut rect) };
+
+        (
+            (rect.right - rect.left) as u32,
+            (rect.bottom - rect.top) as u32
+        )
     }
 
     pub fn kill(&self) {

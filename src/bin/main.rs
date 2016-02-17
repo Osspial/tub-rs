@@ -8,6 +8,7 @@ use std::path::Path;
 fn main() {
     let config = WindowConfig {
         icon: Some(Path::new("tub.ico").to_path_buf()),
+        size: Some((500, 500)),
         .. Default::default()
     };
 
@@ -24,6 +25,7 @@ fn main() {
     let mut reset_owned = false;
 
     window.show();
+    println!("{:?}", window.get_inner_size());
 
     loop {
         for event in window.poll_events() {
@@ -42,6 +44,8 @@ fn main() {
                         Some(_) => ()
                     }
                 }
+
+                Event::Closed => return,
 
                 _ => ()
             }
