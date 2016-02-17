@@ -25,7 +25,7 @@ fn main() {
     let mut reset_owned = false;
 
     window.show();
-    println!("{:?}", window.get_inner_size());
+    println!("{:?}", window.get_outer_size());
 
     loop {
         for event in window.poll_events() {

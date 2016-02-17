@@ -146,8 +146,12 @@ impl<'o> Window<'o> {
         self.internal.get_position()
     }
 
-    pub fn get_inner_size(&self) -> (u32, u32) {
+    pub fn get_inner_size(&self) -> Option<(u32, u32)> {
         self.internal.get_inner_size()
+    }
+
+    pub fn get_outer_size(&self) -> Option<(u32, u32)> {
+        self.internal.get_outer_size()
     }
 
     /// Get a reference to this window's owner, if the window is owned.

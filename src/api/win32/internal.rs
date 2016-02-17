@@ -43,7 +43,7 @@ impl InternalWindow {
 
                 if !config.borderless && !config.tool_window {
                     style |= winapi::WS_CAPTION;
-                    
+
                     if config.resizable {
                         style |= winapi::WS_SIZEBOX;
 
@@ -200,24 +200,29 @@ impl InternalWindow {
     }
 
     #[inline]
-    pub fn get_inner_size(&self) -> (u32, u32) {
-        /*
+    pub fn get_inner_size(&self) -> Option<(u32, u32)> {
         unsafe {
             let mut rect = mem::uninitialized();
-            user32::GetClientRect(self.0, &mut rect);
-
-            ((rect.right - rect.left) as u32, (rect.bottom - rect.top) as u32)
+            
+            match user32::GetClientRect(self.0, &mut rect) {
+                0 => None,
+                _ => Some(((rect.right - rect.left) as u32, 
+                           (rect.bottom - rect.top) as u32))
+            }
         }
-        */
+    }
 
-        let mut rect: winapi::RECT = unsafe { mem::uninitialized() };
-
-        unsafe{ user32::GetClientRect(self.0, &mut rect) };
-
-        (
-            (rect.right - rect.left) as u32,
-            (rect.bottom - rect.top) as u32
-        )
+    #[inline]
+    pub fn get_outer_size(&self) -> Option<(u32, u32)> {
+        unsafe {
+            let mut rect = mem::uninitialized();
+            
+            match user32::GetWindowRect(self.0, &mut rect) {
+                0 => None,
+                _ => Some(((rect.right - rect.left) as u32, 
+                           (rect.bottom - rect.top) as u32))
+            }
+        }
     }
 
     pub fn kill(&self) {
