@@ -154,6 +154,14 @@ impl<'o> Window<'o> {
         self.internal.get_outer_size()
     }
 
+    pub fn set_position(&self, x: i32, y: i32) -> Option<()> {
+        self.internal.set_position(x, y)
+    }
+
+    pub fn set_inner_size(&self, x: u32, y: u32) -> Option<()> {
+        self.internal.set_inner_size(x, y)
+    }
+
     /// Get a reference to this window's owner, if the window is owned.
     pub fn owner(&self) -> Option<&Window> {
         self.owner.clone()

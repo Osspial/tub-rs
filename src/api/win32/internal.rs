@@ -225,6 +225,60 @@ impl InternalWindow {
         }
     }
 
+    #[inline]
+    pub fn set_position(&self, x: i32, y: i32) -> Option<()> {
+        unsafe {
+            let result = user32::SetWindowPos(
+                self.0,
+                ptr::null_mut(),
+                x,
+                y,
+                0,
+                0,
+                winapi::SWP_NOSIZE | winapi::SWP_NOZORDER | winapi::SWP_NOACTIVATE
+            );
+
+            match result {
+                0 => None,
+                _ => Some(())
+            }
+        }
+    }
+
+    #[inline]
+    pub fn set_inner_size(&self, x: u32, y: u32) -> Option<()> {
+        unsafe {
+            let mut rect = winapi::RECT {
+                left: 0,
+                top: 0,
+                right: x as i32,
+                bottom: y as i32
+            };
+
+            user32::AdjustWindowRectEx(
+                &mut rect,
+                user32::GetWindowLongW(self.0, -16) as u32, // Get the window's style
+                0,
+                user32::GetWindowLongW(self.0, -20) as u32  // Get the window's extended style
+            );
+
+            let result = user32::SetWindowPos(
+                self.0,
+                ptr::null_mut(),
+                0,
+                0,
+                rect.right - rect.left,
+                rect.bottom - rect.top,
+                winapi::SWP_NOMOVE | winapi::SWP_NOZORDER | winapi::SWP_NOACTIVATE
+            );
+
+            match result {
+                0 => None,
+                _ => Some(())
+            }
+        }
+    }
+
     pub fn kill(&self) {
         unsafe {
             user32::PostMessageW(self.0, winapi::WM_DESTROY, 0, 0);
