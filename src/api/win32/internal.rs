@@ -320,6 +320,9 @@ thread_local!(pub static CALLBACK_DATA: RefCell<Option<CallbackData>> = RefCell:
 
 pub struct CallbackData {
     win_vec: Vec<WindowDataIntern>,
+    /// A cached index so that the program does not have to search through all of the
+    /// window vertex to get the proper window information
+    win_index: usize,
     win_sender: Sender<WindowData>
 }
 
@@ -331,8 +334,35 @@ impl CallbackData {
 
         CallbackData {
             win_vec: data_vector,
+            win_index: 0,
             win_sender: sender
         }
+    }
+
+    fn get_window_index(&mut self, window: HWND) -> isize {
+        // If the cached index isn't less than the vector length, it cannot be valid.
+        // If the cached index IS less, we can check to see if the window handle at that
+        // index is equal to the given handle.
+        if self.win_index < self.win_vec.len() &&
+           self.win_vec[self.win_index].window == window {
+
+            return self.win_index as isize;
+        }
+
+        let mut index = self.win_vec.len();
+
+        if index != 0 {
+            while index != 0 {
+                index -= 1;
+
+                if self.win_vec[index].window == window {
+                    self.win_index = index;
+                    return index as isize;
+                }
+            }
+        }
+
+        -1
     }
 }
 
@@ -359,34 +389,18 @@ pub const MSG_GAINFOCUS: UINT = 71913;
 
 fn send_event(source: HWND, event: Event) {
     CALLBACK_DATA.with(|data| {
-        let data = data.borrow();
+        let mut data = data.borrow_mut();
 
-        let vector = match *data {
-            Some(ref d) => &d.win_vec,
+        let (index, vector) = match *data {
+            Some(ref mut d) => (d.get_window_index(source), &d.win_vec),
             None => return
         };
 
-        match get_window_index(vector, source) {
+        match index {
             -1  => (),
             i   => {vector[i as usize].sender.send(event).ok();}
         }
     });
-}
-
-fn get_window_index(vector: &Vec<WindowDataIntern>, window: HWND) -> isize {
-    let mut index = vector.len();
-
-    if index != 0 {
-        while index != 0 {
-            index -= 1;
-
-            if vector[index].window == window {
-                return index as isize;
-            }
-        }
-    }
-
-    -1
 }
 
 unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
@@ -470,7 +484,6 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
                 {
                     // This block of code gets a reference to the vector of windows and pushes information
                     // about new window to the top of the vector
-
                     let mut vector = match *data {
                         Some(ref mut v) => &mut v.win_vec,
                         None            => return
@@ -495,16 +508,16 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
             use event::Event::Closed;
 
             CALLBACK_DATA.with(|data| {
-                let mut vector = data.borrow_mut();
+                let mut data = data.borrow_mut();
 
-                let mut vector = match *vector {
-                    Some(ref mut v) => &mut v.win_vec,
+                let (index, mut vector) = match *data {
+                    Some(ref mut d) => (d.get_window_index(hwnd), &mut d.win_vec),
                     None        => return
                 };
 
                 // If this window's information is still in the vector, remove it from
                 // the vector and send the closed message for this window. 
-                match get_window_index(vector, hwnd) {
+                match index {
                     -1  => (),
                     i   => {vector.remove(i as usize).sender.send(Closed).ok();}
                 }
