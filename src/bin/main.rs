@@ -44,6 +44,14 @@ fn main() {
                     }
                 }
 
+                Event::KeyInput(PressState::Pressed, VKeyCode::E) => {
+                    window.set_cursor(tub::CursorType::Crosshair);
+                }
+
+                Event::KeyInput(PressState::Released, VKeyCode::E) =>{
+                    window.set_cursor(tub::CursorType::Arrow);
+                }
+
                 Event::Closed => return,
 
                 _ => ()
@@ -53,6 +61,10 @@ fn main() {
         if let Some(ref owned) = owned_window {
             for event in owned.poll_events() {
                 match event {
+                    Event::KeyInput(PressState::Pressed, VKeyCode::E)   => {
+                        owned.set_cursor(tub::CursorType::Crosshair);
+                    }
+
                     Event::Closed   => {
                         owned.owner().unwrap().enable();
                         owned.owner().unwrap().focus();

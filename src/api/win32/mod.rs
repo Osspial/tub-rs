@@ -9,6 +9,7 @@ use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
 use std::thread;
 
+use CursorType;
 use config::WindowConfig;
 use event::Event;
 
@@ -159,6 +160,10 @@ impl<'o> Window<'o> {
 
     pub fn set_inner_size(&self, x: u32, y: u32) -> Option<()> {
         self.internal.set_inner_size(x, y)
+    }
+
+    pub fn set_cursor(&self, cursor_type: CursorType) {
+        self.internal.set_cursor(cursor_type);
     }
 
     /// Get a reference to this window's owner, if the window is owned.

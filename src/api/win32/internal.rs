@@ -18,6 +18,7 @@ use std::sync::mpsc::{Sender, Receiver};
 
 use num::FromPrimitive;
 
+use CursorType;
 use config::WindowConfig;
 use event::{Event, VKeyCode};
 
@@ -279,6 +280,32 @@ impl InternalWindow {
         }
     }
 
+    pub fn set_cursor(&self, cursor_type: CursorType) {
+        use CursorType::*;
+
+        let cursor_type = match cursor_type {
+            AppStarting     => winapi::IDC_APPSTARTING,
+            Arrow           => winapi::IDC_ARROW,
+            Crosshair       => winapi::IDC_CROSS,
+            Hand            => winapi::IDC_HAND,
+            Help            => winapi::IDC_HELP,
+            Text            => winapi::IDC_IBEAM,
+            Prohibited      => winapi::IDC_NO,
+            ResizeAll       => winapi::IDC_SIZEALL,
+            ResizeNESW      => winapi::IDC_SIZENESW,
+            ResizeNWSE      => winapi::IDC_SIZENWSE,
+            ResizeVertical  => winapi::IDC_SIZENS,
+            ResizeHoriz     => winapi::IDC_SIZEWE,
+            UpArrow         => winapi::IDC_UPARROW,
+            Wait            => winapi::IDC_WAIT
+        };
+
+        unsafe {
+            let cursor = user32::LoadCursorW(ptr::null_mut(), cursor_type);
+            user32::SendMessageW(self.0, MSG_SETCURSOR, cursor as u64, 0);
+        }
+    }
+
     pub fn kill(&self) {
         unsafe {
             user32::PostMessageW(self.0, winapi::WM_DESTROY, 0, 0);
@@ -366,9 +393,13 @@ impl CallbackData {
     }
 }
 
+/// Struct that contains information about the window internal to the callback.
+/// Stuff like the raw window and the event sender are only used by the callback
+/// function, and as such they do not need to be exposed. 
 struct WindowDataIntern {
     window: HWND,
-    sender: Sender<Event>
+    sender: Sender<Event>,
+    cursor: winapi::HCURSOR
 }
 
 impl WindowDataIntern {
@@ -376,7 +407,8 @@ impl WindowDataIntern {
     fn new(window: HWND, sender: Sender<Event>) -> WindowDataIntern {
         WindowDataIntern {
             window: window,
-            sender: sender
+            sender: sender,
+            cursor: unsafe{ user32::LoadCursorW(ptr::null_mut(), winapi::IDC_ARROW) }
         }
     }
 }
@@ -386,6 +418,7 @@ pub struct WindowData( pub InternalWindow, pub Receiver<Event> );
 
 pub const MSG_NEWOWNEDWINDOW: UINT = 0xADD;
 pub const MSG_GAINFOCUS: UINT = 71913;
+pub const MSG_SETCURSOR: UINT = 32118;
 
 fn send_event(source: HWND, event: Event) {
     CALLBACK_DATA.with(|data| {
@@ -427,11 +460,16 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
         }
 
         winapi::WM_SETCURSOR=> {
-            let cursor =  user32::LoadCursorW(ptr::null_mut(), winapi::IDC_WAIT);
-            if cursor != ptr::null_mut() {
-                user32::SetCursor(cursor);
-            }
+            CALLBACK_DATA.with(|data| {
+                let mut data = data.borrow_mut();
+                let (index, data) = match *data {
+                    Some(ref mut d) => (d.get_window_index(hwnd) as usize, d),
+                    _        => return
+                };
 
+                user32::SetCursor(data.win_vec[index].cursor);
+            });
+            
             0            
         }
 
@@ -456,6 +494,30 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
             user32::FillRect(hdc, &pstruct.rcPaint, gdi32::CreateSolidBrush(0x000000));
 
             user32::EndPaint(hwnd, &pstruct);
+            0
+        }
+
+        MSG_SETCURSOR       => {
+            let cursor = wparam as *mut _;
+
+            CALLBACK_DATA.with(|data| {
+                let mut data = data.borrow_mut();
+                match *data {
+                    Some(ref mut d) => {
+                        let index = d.get_window_index(hwnd) as usize;
+                        d.win_vec[index].cursor = cursor;
+
+                        if hwnd == user32::GetActiveWindow() {
+                            user32::SetCursor(cursor);
+                        }
+
+                        Some(())
+                    }
+
+                    None => None
+                }
+            });
+
             0
         }
 
