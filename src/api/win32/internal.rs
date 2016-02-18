@@ -316,24 +316,43 @@ unsafe fn register_window_class() -> Vec<u16> {
 
 
 
-thread_local!(pub static CALLBACK_DATA: RefCell<Option<(Vec<CallbackData>, Sender<WindowData>)>> = RefCell::new(None));
+thread_local!(pub static CALLBACK_DATA: RefCell<Option<CallbackData>> = RefCell::new(None));
 
 pub struct CallbackData {
-    pub window: HWND,
-    pub sender: Sender<Event>
+    win_vec: Vec<WindowDataIntern>,
+    win_sender: Sender<WindowData>
 }
-
-pub struct WindowData( pub InternalWindow, pub Receiver<Event> );
 
 impl CallbackData {
     #[inline]
-    pub fn new(window: HWND, sender: Sender<Event>) -> CallbackData {
+    pub fn new(vec_window: HWND, event_sender: Sender<Event>, sender: Sender<WindowData>) -> CallbackData {
+        let mut data_vector = Vec::with_capacity(4);
+        data_vector.push(WindowDataIntern::new(vec_window, event_sender));
+
         CallbackData {
+            win_vec: data_vector,
+            win_sender: sender
+        }
+    }
+}
+
+struct WindowDataIntern {
+    window: HWND,
+    sender: Sender<Event>
+}
+
+impl WindowDataIntern {
+    #[inline]
+    fn new(window: HWND, sender: Sender<Event>) -> WindowDataIntern {
+        WindowDataIntern {
             window: window,
             sender: sender
         }
     }
 }
+
+pub struct WindowData( pub InternalWindow, pub Receiver<Event> );
+
 
 pub const MSG_NEWOWNEDWINDOW: UINT = 0xADD;
 pub const MSG_GAINFOCUS: UINT = 71913;
@@ -343,7 +362,7 @@ fn send_event(source: HWND, event: Event) {
         let data = data.borrow();
 
         let vector = match *data {
-            Some(ref d) => &d.0,
+            Some(ref d) => &d.win_vec,
             None => return
         };
 
@@ -354,7 +373,7 @@ fn send_event(source: HWND, event: Event) {
     });
 }
 
-fn get_window_index(vector: &Vec<CallbackData>, window: HWND) -> isize {
+fn get_window_index(vector: &Vec<WindowDataIntern>, window: HWND) -> isize {
     let mut index = vector.len();
 
     if index != 0 {
@@ -444,16 +463,16 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
                     // about new window to the top of the vector
 
                     let mut vector = match *data {
-                        Some(ref mut v) => &mut v.0,
+                        Some(ref mut v) => &mut v.win_vec,
                         None            => return
                     };
 
-                    vector.push(CallbackData::new(internal_window.0, tx));
+                    vector.push(WindowDataIntern::new(internal_window.0, tx));
                 }
                 
                 // Get a reference to the window data sender
                 let sender = match *data {
-                    Some(ref r) => &r.1,
+                    Some(ref r) => &r.win_sender,
                     None        => return
                 };
 
@@ -470,7 +489,7 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
                 let mut vector = data.borrow_mut();
 
                 let mut vector = match *vector {
-                    Some(ref mut v) => &mut v.0,
+                    Some(ref mut v) => &mut v.win_vec,
                     None        => return
                 };
 

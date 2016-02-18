@@ -49,12 +49,11 @@ impl<'o> Window<'o> {
                 // Event channel
                 let (sx, rx) = mpsc::channel();
 
-                CALLBACK_DATA.with(|sender| {
-                    let mut data_vector = Vec::with_capacity(4);
-                    data_vector.push(CallbackData::new(internal_window.0, sx));
+                CALLBACK_DATA.with(move |sender| {
+                    let callback_data = CallbackData::new(internal_window.0, sx, tx.clone());
 
                     tx.send(WindowData(internal_window, rx)).unwrap();
-                    *sender.borrow_mut() = Some((data_vector, tx));
+                    *sender.borrow_mut() = Some(callback_data);
                 });
 
                 let mut msg = mem::uninitialized();
