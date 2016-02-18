@@ -412,6 +412,15 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
             0
         }
 
+        winapi::WM_SETCURSOR=> {
+            let cursor =  user32::LoadCursorW(ptr::null_mut(), winapi::IDC_WAIT);
+            if cursor != ptr::null_mut() {
+                user32::SetCursor(cursor);
+            }
+
+            0            
+        }
+
         winapi::WM_KEYUP    => {
             use event::Event::KeyInput;
             use event::PressState;
