@@ -13,6 +13,9 @@ pub enum Event {
     MouseLeave,
     /// Triggered when the mouse enters the client area
     MouseEnter,
+    /// Triggered when the window is resized - note that this includes when the window
+    /// is first created.
+    Resized(ResizeType, u32, u32),
     Closed
 }
 
@@ -33,6 +36,17 @@ pub enum MButton {
     Middle = 2,
     Button4 = 3,
     Button5 = 4
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum ResizeType {
+    /// Sent when a window is maximized
+    Maximized,
+    /// Sent when a window is minimized
+    Minimized,
+    /// Sent when the size of a window is changed by dragging at the edge of the window
+    Changed
 }
 
 #[repr(u8)]

@@ -631,6 +631,20 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
             0
         }
 
+        winapi::WM_SIZE     => {
+            use event::ResizeType::*;
+
+            let resize_type = match wparam {
+                1 => Minimized,
+                2 => Maximized,
+                0 => Changed,
+                _ => panic!("Unhandled popup window resize; open error on github with the breaking code")
+            };
+
+            send_event(hwnd, Event::Resized(resize_type, lparam as u32 >> 16, lparam as u32 & 0xFFFF));
+            0
+        }
+
         // Currently only draws black.
         // TODO: Make it actually draw shit
         winapi::WM_PAINT    => {
