@@ -3,6 +3,16 @@ use num::FromPrimitive;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Event {
     KeyInput(PressState, VKeyCode),
+    MButtonInput(PressState, MButton),
+    /// Triggered when the mouse moves
+    MouseMoved(i32, i32),
+    /// Triggered when the mouse hovers over one point for a system-specified length
+    /// of time
+    MouseHover(i32, i32),
+    /// Triggered when the mouse leaves the client area
+    MouseLeave,
+    /// Triggered when the mouse enters the client area
+    MouseEnter,
     Closed
 }
 
@@ -13,6 +23,16 @@ pub enum PressState {
     /// been held down for long enough. When that happens, this state is triggered.
     Held,
     Released
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum MButton {
+    Left = 0,
+    Right = 1,
+    Middle = 2,
+    Button4 = 3,
+    Button5 = 4
 }
 
 #[repr(u8)]

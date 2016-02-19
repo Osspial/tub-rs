@@ -3,7 +3,7 @@ use user32;
 use kernel32;
 use gdi32;
 
-use winapi::{UINT, WPARAM, LPARAM};
+use winapi::{UINT, DWORD, WPARAM, LPARAM};
 use winapi::windef::HWND;
 use winapi::winuser::WNDCLASSEXW;
 
@@ -350,7 +350,10 @@ pub struct CallbackData {
     /// A cached index so that the program does not have to search through all of the
     /// window vertex to get the proper window information
     win_index: usize,
-    win_sender: Sender<WindowData>
+    win_sender: Sender<WindowData>,
+    /// The last position of the mouse. This is used to catch duplicate WM_MOUSEHOVER
+    /// messages.
+    last_mpos: LPARAM
 }
 
 impl CallbackData {
@@ -362,7 +365,8 @@ impl CallbackData {
         CallbackData {
             win_vec: data_vector,
             win_index: 0,
-            win_sender: sender
+            win_sender: sender,
+            last_mpos: LPARAM::max_value()
         }
     }
 
@@ -459,6 +463,18 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
             0
         }
 
+        winapi::WM_KEYUP    => {
+            use event::Event::KeyInput;
+            use event::PressState;
+
+            match VKeyCode::from_u64(wparam) {
+                Some(k) => send_event(hwnd, KeyInput(PressState::Released, k)),
+                None    => ()
+            }
+
+            0
+        }
+
         winapi::WM_SETCURSOR=> {
             CALLBACK_DATA.with(|data| {
                 let mut data = data.borrow_mut();
@@ -473,14 +489,140 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
             0            
         }
 
-        winapi::WM_KEYUP    => {
-            use event::Event::KeyInput;
+        winapi::WM_LBUTTONDOWN  => {
             use event::PressState;
+            use event::MButton::*;
 
-            match VKeyCode::from_u64(wparam) {
-                Some(k) => send_event(hwnd, KeyInput(PressState::Released, k)),
-                None    => ()
+            send_event(hwnd, Event::MButtonInput(PressState::Pressed, Left));
+
+            0
+        }
+
+        winapi::WM_LBUTTONUP    => {
+            use event::PressState;
+            use event::MButton::*;
+
+            send_event(hwnd, Event::MButtonInput(PressState::Released, Left));
+
+            0
+        }
+
+        winapi::WM_RBUTTONDOWN  => {
+            use event::PressState;
+            use event::MButton::*;
+
+            send_event(hwnd, Event::MButtonInput(PressState::Pressed, Right));
+
+            0
+        }
+
+        winapi::WM_RBUTTONUP    => {
+            use event::PressState;
+            use event::MButton::*;
+
+            send_event(hwnd, Event::MButtonInput(PressState::Released, Right));
+
+            0
+        }
+
+        winapi::WM_MBUTTONDOWN  => {
+            use event::PressState;
+            use event::MButton::*;
+
+            send_event(hwnd, Event::MButtonInput(PressState::Pressed, Middle));
+
+            0
+        }
+
+        winapi::WM_MBUTTONUP    => {
+            use event::PressState;
+            use event::MButton::*;
+
+            send_event(hwnd, Event::MButtonInput(PressState::Released, Middle));
+
+            0
+        }
+
+        winapi::WM_XBUTTONDOWN  => {
+            use event::PressState;
+            use event::MButton::*;
+
+            match wparam >> 16 & 0xFFFF {
+                1 => send_event(hwnd, Event::MButtonInput(PressState::Pressed, Button4)),
+                2 => send_event(hwnd, Event::MButtonInput(PressState::Pressed, Button5)),
+                _ => panic!("A new mouse button approaches...")
             }
+
+            0
+        }
+
+        winapi::WM_XBUTTONUP    => {
+            use event::PressState;
+            use event::MButton::*;
+
+            match wparam >> 16 & 0xFFFF {
+                1 => send_event(hwnd, Event::MButtonInput(PressState::Released, Button4)),
+                2 => send_event(hwnd, Event::MButtonInput(PressState::Released, Button5)),
+                _ => panic!("A new mouse button approaches...")
+            }
+
+            0
+        }
+
+        winapi::WM_MOUSEMOVE    => {
+            CALLBACK_DATA.with(|data| {
+                
+                let mpos = {
+                    let mut data = data.borrow_mut();
+                    match *data {
+                        Some(ref mut d) => {
+                            let ret = d.last_mpos;
+                            d.last_mpos = lparam;
+                            ret
+                        }
+
+                        None => return 1
+                    }
+                };
+                
+
+                if mpos == LPARAM::max_value() {
+                    send_event(hwnd, Event::MouseEnter);
+                }
+
+                if mpos != lparam {
+                    let mut mouse_track = winapi::TRACKMOUSEEVENT {
+                        cbSize: mem::size_of::<winapi::TRACKMOUSEEVENT>() as DWORD,
+                        dwFlags: winapi::TME_HOVER | winapi::TME_LEAVE,
+                        hwndTrack: hwnd,
+                        dwHoverTime: winapi::HOVER_DEFAULT
+                    };
+
+                    user32::TrackMouseEvent(&mut mouse_track);
+                    send_event(hwnd, Event::MouseMoved(lparam as i32 >> 16, lparam as i32 & 0xFFFF));
+
+                    0
+                }
+                else {1}
+            })
+        }
+
+        winapi::WM_MOUSELEAVE   => {
+            CALLBACK_DATA.with(|data| {
+                let mut data = data.borrow_mut();
+                match *data {
+                    Some(ref mut d) => d.last_mpos = LPARAM::max_value(),
+                    None => return
+                }
+            });
+
+            send_event(hwnd, Event::MouseLeave);
+
+            0
+        }
+
+        winapi::WM_MOUSEHOVER   => {
+            send_event(hwnd, Event::MouseHover(lparam as i32 >> 16, lparam as i32 & 0xFFFF));
 
             0
         }
