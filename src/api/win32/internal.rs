@@ -480,13 +480,17 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
                 let mut data = data.borrow_mut();
                 let (index, data) = match *data {
                     Some(ref mut d) => (d.get_window_index(hwnd) as usize, d),
-                    _        => return
+                    _        => return 1
                 };
 
-                user32::SetCursor(data.win_vec[index].cursor);
-            });
-            
-            0            
+                if data.last_mpos != LPARAM::max_value() {
+                    user32::SetCursor(data.win_vec[index].cursor);
+                    0
+                }
+                else {
+                    user32::DefWindowProcW(hwnd, msg, wparam, lparam)
+                }
+            })
         }
 
         winapi::WM_LBUTTONDOWN  => {
