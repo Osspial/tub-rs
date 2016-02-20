@@ -297,7 +297,8 @@ impl InternalWindow {
             ResizeVertical  => winapi::IDC_SIZENS,
             ResizeHoriz     => winapi::IDC_SIZEWE,
             UpArrow         => winapi::IDC_UPARROW,
-            Wait            => winapi::IDC_WAIT
+            Wait            => winapi::IDC_WAIT,
+            Invisible       => ptr::null()
         };
 
         unsafe {

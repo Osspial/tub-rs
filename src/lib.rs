@@ -23,5 +23,6 @@ pub enum CursorType {
     ResizeVertical,
     ResizeHoriz,
     UpArrow,
-    Wait
+    Wait,
+    Invisible
 }

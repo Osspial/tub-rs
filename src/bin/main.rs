@@ -48,8 +48,13 @@ fn main() {
                     window.set_cursor(tub::CursorType::Crosshair);
                 }
 
-                Event::KeyInput(PressState::Released, VKeyCode::E) =>{
+                Event::KeyInput(PressState::Released, VKeyCode::E)|
+                Event::KeyInput(PressState::Released, VKeyCode::I) =>{
                     window.set_cursor(tub::CursorType::Arrow);
+                }
+
+                Event::KeyInput(PressState::Pressed, VKeyCode::I) => {
+                    window.set_cursor(tub::CursorType::Invisible);
                 }
 
                 Event::Closed => return,
