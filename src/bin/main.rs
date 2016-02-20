@@ -27,8 +27,9 @@ fn main() {
     window.show();
 
     loop {
+        window.set_cursor_pos(250, 250);
         for event in window.poll_events() {
-            println!("{:?}", event);
+            //println!("{:?}", event);
             match event {
                 Event::KeyInput(PressState::Pressed, VKeyCode::D)   => {
                     match owned_window {
@@ -48,13 +49,22 @@ fn main() {
                     window.set_cursor(tub::CursorType::Crosshair);
                 }
 
+                Event::KeyInput(PressState::Pressed, VKeyCode::I) => {
+                    window.set_cursor(tub::CursorType::Invisible);
+                }
+
+                Event::KeyInput(PressState::Pressed, VKeyCode::G) => {
+                    window.set_cursor(tub::CursorType::Hand);
+                }
+
                 Event::KeyInput(PressState::Released, VKeyCode::E)|
-                Event::KeyInput(PressState::Released, VKeyCode::I) =>{
+                Event::KeyInput(PressState::Released, VKeyCode::I)|
+                Event::KeyInput(PressState::Released, VKeyCode::G) =>{
                     window.set_cursor(tub::CursorType::Arrow);
                 }
 
-                Event::KeyInput(PressState::Pressed, VKeyCode::I) => {
-                    window.set_cursor(tub::CursorType::Invisible);
+                Event::KeyInput(PressState::Pressed, VKeyCode::C) => {
+                    window.set_cursor_pos(250, 250);
                 }
 
                 Event::Closed => return,

@@ -189,7 +189,24 @@ impl InternalWindow {
     }
 
     #[inline]
-    pub fn get_position(&self) -> Option<(i32, i32)> {
+    pub fn get_inner_position(&self) -> Option<(i32, i32)> {
+        use winapi::POINT;
+
+        unsafe {
+            let mut point = POINT {
+                x: 0,
+                y: 0
+            };
+
+            match user32::ClientToScreen(self.0, &mut point) {
+                0 => None,
+                _ => Some((point.x as i32, point.y as i32))
+            }
+        }
+    }
+
+    #[inline]
+    pub fn get_outer_position(&self) -> Option<(i32, i32)> {
         unsafe {
             let mut rect = mem::uninitialized();
 
@@ -280,6 +297,16 @@ impl InternalWindow {
         }
     }
 
+    pub fn is_active(&self) -> bool {
+        unsafe {
+            let mut is_active = false;
+
+            user32::SendMessageW(self.0, MSG_ISACTIVEWIN, &mut is_active as *mut bool as WPARAM, 0);
+            is_active
+        }
+    }
+
+    #[inline]
     pub fn set_cursor(&self, cursor_type: CursorType) {
         use CursorType::*;
 
@@ -424,6 +451,7 @@ pub struct WindowData( pub InternalWindow, pub Receiver<Event> );
 pub const MSG_NEWOWNEDWINDOW: UINT = 0xADD;
 pub const MSG_GAINFOCUS: UINT = 71913;
 pub const MSG_SETCURSOR: UINT = 32118;
+pub const MSG_ISACTIVEWIN: UINT = 0xAC20;
 
 fn send_event(source: HWND, event: Event) {
     CALLBACK_DATA.with(|data| {
@@ -769,6 +797,17 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
 
                 sender.send(WindowData(internal_window, rx)).ok();
             });
+
+            0
+        }
+
+        MSG_ISACTIVEWIN => {
+            if hwnd == user32::GetActiveWindow() {
+                *(wparam as *mut bool) = true;
+            }
+            else {
+                *(wparam as *mut bool) = false;
+            }
 
             0
         }

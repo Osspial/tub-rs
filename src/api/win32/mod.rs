@@ -1,4 +1,5 @@
 mod internal;
+pub mod os;
 use self::internal::{InternalWindow, CallbackData, WindowData, CALLBACK_DATA};
 
 use user32;
@@ -141,9 +142,13 @@ impl<'o> Window<'o> {
         self.internal.focus();
     }
 
+    pub fn get_inner_position(&self) -> Option<(i32, i32)> {
+        self.internal.get_inner_position()
+    }
+
     /// Gets the position of the upper-left corner of the window, including the title bar
-    pub fn get_position(&self) -> Option<(i32, i32)> {
-        self.internal.get_position()
+    pub fn get_outer_position(&self) -> Option<(i32, i32)> {
+        self.internal.get_outer_position()
     }
 
     pub fn get_inner_size(&self) -> Option<(u32, u32)> {
@@ -162,8 +167,35 @@ impl<'o> Window<'o> {
         self.internal.set_inner_size(x, y)
     }
 
+    pub fn is_active(&self) -> bool {
+        self.internal.is_active()
+    }
+
     pub fn set_cursor(&self, cursor_type: CursorType) {
         self.internal.set_cursor(cursor_type);
+    }
+
+    pub fn set_cursor_pos(&self, x: i32, y: i32) {
+        let cursor_in_client = {
+            let size = match self.get_inner_size() {
+                Some(s) => (s.0 as i32, s.1 as i32),
+                None    => return
+            };
+            let (cx, cy) = self::os::get_cursor_pos();
+
+            let (xmin, ymin) = self.get_inner_position().unwrap();
+            let (xmax, ymax) = (xmin + size.0, ymin + size.1);
+
+            xmin < cx && cx < xmax &&
+            ymin < cy && cy < ymax
+        };
+
+
+        if self.is_active() && cursor_in_client {
+            let pos = self.get_inner_position().unwrap();
+
+            self::os::set_cursor_pos(x + pos.0, y + pos.1);
+        }
     }
 
     /// Get a reference to this window's owner, if the window is owned.
