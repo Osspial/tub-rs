@@ -22,6 +22,7 @@ pub enum Event {
     /// Triggered when the window is resized - note that this includes when the window
     /// is first created.
     Resized(ResizeType, Xu32, Xu32),
+    Moved(Xi32, Yi32),
     Closed
 }
 

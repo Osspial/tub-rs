@@ -643,7 +643,7 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
                     };
 
                     user32::TrackMouseEvent(&mut mouse_track);
-                    send_event(hwnd, Event::MouseMoved(lparam as i32 >> 16, lparam as i32 & 0xFFFF));
+                    send_event(hwnd, Event::MouseMoved(lparam as i32 >> 16, lparam as i16 as i32));
 
                     0
                 }
@@ -666,7 +666,7 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
         }
 
         winapi::WM_MOUSEHOVER   => {
-            send_event(hwnd, Event::MouseHover(lparam as i32 >> 16, lparam as i32 & 0xFFFF));
+            send_event(hwnd, Event::MouseHover(lparam as i32 >> 16, lparam as i16 as i32));
 
             0
         }
@@ -682,6 +682,12 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
             };
 
             send_event(hwnd, Event::Resized(resize_type, lparam as u32 >> 16, lparam as u32 & 0xFFFF));
+            0
+        }
+
+        winapi::WM_MOVE     => {
+            send_event(hwnd, Event::Moved(lparam as i32 >> 16, lparam as i16 as i32));
+
             0
         }
 
