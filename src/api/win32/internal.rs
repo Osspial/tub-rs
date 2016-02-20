@@ -64,6 +64,10 @@ impl InternalWindow {
                     style_ex |= winapi::WS_EX_TOOLWINDOW;
                 }
 
+                if config.topmost {
+                    style_ex |= winapi::WS_EX_TOPMOST;
+                }
+
                 match config.initial_state {
                     Windowed    => (),
                     Minimized   => style |= winapi::WS_MINIMIZE,

@@ -6,6 +6,10 @@ pub struct WindowConfig {
     /// The window's dimensions
     pub size: Option<(i32, i32)>,
 
+    /// Whether or not the window is a topmost window. If true, this window will
+    /// always appear at the top of the Z order
+    pub topmost: bool,
+
     /// Whether or not the window is a borderless window. Note that this will
     /// override any specified window decorations.
     pub borderless: bool,
@@ -30,6 +34,8 @@ impl Default for WindowConfig {
         WindowConfig {
             size: None,
 
+            topmost: false,
+            
             borderless: false,
             resizable: true,
             maximizable: true,

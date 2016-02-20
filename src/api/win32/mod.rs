@@ -175,6 +175,11 @@ impl<'o> Window<'o> {
         self.internal.set_cursor(cursor_type);
     }
 
+    /// Sets the cursor position relative to window space. Note that this will fail in a few
+    /// conditions:
+    ///
+    /// * If the window isn't currently active
+    /// * If the cursor is outside of the window's client area
     pub fn set_cursor_pos(&self, x: i32, y: i32) {
         let cursor_in_client = {
             let size = match self.get_inner_size() {
