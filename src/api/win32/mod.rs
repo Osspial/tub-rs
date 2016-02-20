@@ -142,13 +142,13 @@ impl<'o> Window<'o> {
         self.internal.focus();
     }
 
-    pub fn get_inner_position(&self) -> Option<(i32, i32)> {
-        self.internal.get_inner_position()
+    pub fn get_inner_pos(&self) -> Option<(i32, i32)> {
+        self.internal.get_inner_pos()
     }
 
     /// Gets the position of the upper-left corner of the window, including the title bar
-    pub fn get_outer_position(&self) -> Option<(i32, i32)> {
-        self.internal.get_outer_position()
+    pub fn get_outer_pos(&self) -> Option<(i32, i32)> {
+        self.internal.get_outer_pos()
     }
 
     pub fn get_inner_size(&self) -> Option<(u32, u32)> {
@@ -159,8 +159,8 @@ impl<'o> Window<'o> {
         self.internal.get_outer_size()
     }
 
-    pub fn set_position(&self, x: i32, y: i32) -> Option<()> {
-        self.internal.set_position(x, y)
+    pub fn set_pos(&self, x: i32, y: i32) -> Option<()> {
+        self.internal.set_pos(x, y)
     }
 
     pub fn set_inner_size(&self, x: u32, y: u32) -> Option<()> {
@@ -188,7 +188,7 @@ impl<'o> Window<'o> {
             };
             let (cx, cy) = self::os::get_cursor_pos();
 
-            let (xmin, ymin) = self.get_inner_position().unwrap();
+            let (xmin, ymin) = self.get_inner_pos().unwrap();
             let (xmax, ymax) = (xmin + size.0, ymin + size.1);
 
             xmin < cx && cx < xmax &&
@@ -197,7 +197,7 @@ impl<'o> Window<'o> {
 
 
         if self.is_active() && cursor_in_client {
-            let pos = self.get_inner_position().unwrap();
+            let pos = self.get_inner_pos().unwrap();
 
             self::os::set_cursor_pos(x + pos.0, y + pos.1);
         }

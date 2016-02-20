@@ -193,7 +193,7 @@ impl InternalWindow {
     }
 
     #[inline]
-    pub fn get_inner_position(&self) -> Option<(i32, i32)> {
+    pub fn get_inner_pos(&self) -> Option<(i32, i32)> {
         use winapi::POINT;
 
         unsafe {
@@ -210,7 +210,7 @@ impl InternalWindow {
     }
 
     #[inline]
-    pub fn get_outer_position(&self) -> Option<(i32, i32)> {
+    pub fn get_outer_pos(&self) -> Option<(i32, i32)> {
         unsafe {
             let mut rect = mem::uninitialized();
 
@@ -248,7 +248,7 @@ impl InternalWindow {
     }
 
     #[inline]
-    pub fn set_position(&self, x: i32, y: i32) -> Option<()> {
+    pub fn set_pos(&self, x: i32, y: i32) -> Option<()> {
         unsafe {
             let result = user32::SetWindowPos(
                 self.0,

@@ -27,7 +27,6 @@ fn main() {
     window.show();
 
     loop {
-        window.set_cursor_pos(250, 250);
         for event in window.poll_events() {
             //println!("{:?}", event);
             match event {
