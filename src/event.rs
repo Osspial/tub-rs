@@ -1,30 +1,45 @@
 use num::FromPrimitive;
 
+pub type Xi32 = i32;
+pub type Yi32 = i32;
+pub type Xu32 = u32;
+pub type Yu32 = u32;
+
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Event {
     KeyInput(PressState, VKeyCode),
-    MButtonInput(PressState, MButton),
+    MButtonInput(ClickType, MButton),
     /// Triggered when the mouse moves
-    MouseMoved(i32, i32),
+    MouseMoved(Xi32, Yi32),
     /// Triggered when the mouse hovers over one point for a system-specified length
     /// of time
-    MouseHover(i32, i32),
+    MouseHover(Xi32, Yi32),
     /// Triggered when the mouse leaves the client area
     MouseLeave,
     /// Triggered when the mouse enters the client area
     MouseEnter,
     /// Triggered when the window is resized - note that this includes when the window
     /// is first created.
-    Resized(ResizeType, u32, u32),
+    Resized(ResizeType, Xu32, Xu32),
     Closed
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
 pub enum PressState {
     Pressed,
     /// On windows, additional virtual keypresses are generated after a key has
     /// been held down for long enough. When that happens, this state is triggered.
     Held,
+    Released
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum ClickType {
+    Single,
+    Double,
     Released
 }
 

@@ -324,7 +324,7 @@ unsafe fn register_window_class() -> Vec<u16> {
 
     let window_class = WNDCLASSEXW {
         cbSize: mem::size_of::<WNDCLASSEXW>() as winapi::UINT,
-        style: winapi::CS_OWNDC | winapi::CS_VREDRAW | winapi::CS_HREDRAW,
+        style: winapi::CS_OWNDC | winapi::CS_VREDRAW | winapi::CS_HREDRAW | winapi::CS_DBLCLKS,
         lpfnWndProc: Some(callback),
         cbClsExtra: 0,
         cbWndExtra: 0,
@@ -494,66 +494,106 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
         }
 
         winapi::WM_LBUTTONDOWN  => {
-            use event::PressState;
+            use event::ClickType;
             use event::MButton::*;
 
-            send_event(hwnd, Event::MButtonInput(PressState::Pressed, Left));
+            send_event(hwnd, Event::MButtonInput(ClickType::Single, Left));
 
             0
         }
 
         winapi::WM_LBUTTONUP    => {
-            use event::PressState;
+            use event::ClickType;
             use event::MButton::*;
 
-            send_event(hwnd, Event::MButtonInput(PressState::Released, Left));
+            send_event(hwnd, Event::MButtonInput(ClickType::Released, Left));
+
+            0
+        }
+
+        winapi::WM_LBUTTONDBLCLK    => {
+            use event::ClickType;
+            use event::MButton::*;
+
+            send_event(hwnd, Event::MButtonInput(ClickType::Double, Left));
 
             0
         }
 
         winapi::WM_RBUTTONDOWN  => {
-            use event::PressState;
+            use event::ClickType;
             use event::MButton::*;
 
-            send_event(hwnd, Event::MButtonInput(PressState::Pressed, Right));
+            send_event(hwnd, Event::MButtonInput(ClickType::Single, Right));
 
             0
         }
 
         winapi::WM_RBUTTONUP    => {
-            use event::PressState;
+            use event::ClickType;
             use event::MButton::*;
 
-            send_event(hwnd, Event::MButtonInput(PressState::Released, Right));
+            send_event(hwnd, Event::MButtonInput(ClickType::Released, Right));
+
+            0
+        }
+
+        winapi::WM_RBUTTONDBLCLK    => {
+            use event::ClickType;
+            use event::MButton::*;
+
+            send_event(hwnd, Event::MButtonInput(ClickType::Double, Right));
 
             0
         }
 
         winapi::WM_MBUTTONDOWN  => {
-            use event::PressState;
+            use event::ClickType;
             use event::MButton::*;
 
-            send_event(hwnd, Event::MButtonInput(PressState::Pressed, Middle));
+            send_event(hwnd, Event::MButtonInput(ClickType::Single, Middle));
 
             0
         }
 
         winapi::WM_MBUTTONUP    => {
-            use event::PressState;
+            use event::ClickType;
             use event::MButton::*;
 
-            send_event(hwnd, Event::MButtonInput(PressState::Released, Middle));
+            send_event(hwnd, Event::MButtonInput(ClickType::Released, Middle));
+
+            0
+        }
+
+        winapi::WM_MBUTTONDBLCLK    => {
+            use event::ClickType;
+            use event::MButton::*;
+
+            send_event(hwnd, Event::MButtonInput(ClickType::Double, Middle));
 
             0
         }
 
         winapi::WM_XBUTTONDOWN  => {
-            use event::PressState;
+            use event::ClickType;
             use event::MButton::*;
 
             match wparam >> 16 & 0xFFFF {
-                1 => send_event(hwnd, Event::MButtonInput(PressState::Pressed, Button4)),
-                2 => send_event(hwnd, Event::MButtonInput(PressState::Pressed, Button5)),
+                1 => send_event(hwnd, Event::MButtonInput(ClickType::Single, Button4)),
+                2 => send_event(hwnd, Event::MButtonInput(ClickType::Single, Button5)),
+                _ => panic!("A new mouse button approaches...")
+            }
+
+            0
+        }
+
+        winapi::WM_XBUTTONDBLCLK    => {
+            use event::ClickType;
+            use event::MButton::*;
+
+            match wparam >> 16 & 0xFFFF {
+                1 => send_event(hwnd, Event::MButtonInput(ClickType::Double, Button4)),
+                2 => send_event(hwnd, Event::MButtonInput(ClickType::Double, Button5)),
                 _ => panic!("A new mouse button approaches...")
             }
 
@@ -561,12 +601,12 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
         }
 
         winapi::WM_XBUTTONUP    => {
-            use event::PressState;
+            use event::ClickType;
             use event::MButton::*;
 
             match wparam >> 16 & 0xFFFF {
-                1 => send_event(hwnd, Event::MButtonInput(PressState::Released, Button4)),
-                2 => send_event(hwnd, Event::MButtonInput(PressState::Released, Button5)),
+                1 => send_event(hwnd, Event::MButtonInput(ClickType::Released, Button4)),
+                2 => send_event(hwnd, Event::MButtonInput(ClickType::Released, Button5)),
                 _ => panic!("A new mouse button approaches...")
             }
 

@@ -25,7 +25,6 @@ fn main() {
     let mut reset_owned = false;
 
     window.show();
-    window.set_cursor(tub::CursorType::Crosshair);
 
     loop {
         for event in window.poll_events() {
