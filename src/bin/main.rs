@@ -25,7 +25,7 @@ fn main() {
     let mut reset_owned = false;
 
     window.show();
-
+    println!("{:?}", api::os::get_background_color());
     loop {
         for event in window.poll_events() {
             //println!("{:?}", event);
