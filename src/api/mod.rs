@@ -1,3 +1,2 @@
-mod win32;
-
-pub use self::win32::*;
+pub mod win32;
+pub mod wgl;

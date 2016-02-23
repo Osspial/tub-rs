@@ -1,6 +1,6 @@
 extern crate tub;
 
-use tub::api;
+use tub::platform;
 use tub::config::{WindowConfig};
 use tub::event::{Event, PressState, VKeyCode};
 use std::path::Path;
@@ -18,14 +18,16 @@ fn main() {
         .. Default::default()
     };
 
-    let window = api::Window::new("It's a window!", config.clone());
-    window.focus();
-    let mut owned_window: Option<api::Window> = None;
+    let window = platform::Window::new("It's a window!", config.clone());
+    let window_context = platform::GlContext::new(&window, Default::default());
+    unsafe{ window_context.make_current() };
+
+    let mut owned_window: Option<platform::Window> = None;
 
     let mut reset_owned = false;
 
     window.show();
-    println!("{:?}", api::os::get_background_color());
+    window.focus();
     loop {
         for event in window.poll_events() {
             //println!("{:?}", event);

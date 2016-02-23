@@ -1,10 +1,9 @@
 use winapi;
 use user32;
 use kernel32;
-use gdi32;
 
 use winapi::{UINT, DWORD, WPARAM, LPARAM};
-use winapi::windef::HWND;
+use winapi::windef::{HWND, HDC};
 use winapi::winuser::WNDCLASSEXW;
 
 use std::ptr;
@@ -23,7 +22,7 @@ use config::WindowConfig;
 use event::{Event, VKeyCode};
 
 #[derive(Clone)]
-pub struct InternalWindow( pub HWND );
+pub struct InternalWindow( pub HWND, pub HDC );
 
 unsafe impl Send for InternalWindow {}
 unsafe impl Sync for InternalWindow {}
@@ -142,7 +141,12 @@ impl InternalWindow {
                 }
             }
 
-            InternalWindow( window_handle )
+            let hdc = user32::GetDC(window_handle);
+            if hdc == ptr::null_mut() {
+                panic!(format!("Error: {}", ::std::io::Error::last_os_error()));
+            }
+
+            InternalWindow( window_handle, hdc )
         }
     }
 
@@ -721,18 +725,6 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
         winapi::WM_MOVE     => {
             send_event(hwnd, Event::Moved(lparam as i32 >> 16, lparam as i16 as i32));
 
-            0
-        }
-
-        // Currently only draws black.
-        // TODO: Make it actually draw shit
-        winapi::WM_PAINT    => {
-            let mut pstruct = mem::uninitialized();
-            let hdc = user32::BeginPaint(hwnd, &mut pstruct);
-
-            user32::FillRect(hdc, &pstruct.rcPaint, gdi32::CreateSolidBrush(0x000000));
-
-            user32::EndPaint(hwnd, &pstruct);
             0
         }
 

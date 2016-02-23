@@ -2,6 +2,7 @@
 name = "tub"
 version = "0.1.0"
 authors = ["Osspial <osspial@gmail.com>"]
+build = "build.rs"
 
 [dependencies]
 num = "0.1"
@@ -10,3 +11,7 @@ winapi = "0.2"
 user32-sys = "0.1"
 gdi32-sys = "0.2"
 kernel32-sys = "0.2"
+
+[build-dependencies]
+gl_generator = "0.4"
+khronos_api = "1.0"

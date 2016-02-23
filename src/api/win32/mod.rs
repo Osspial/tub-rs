@@ -1,4 +1,4 @@
-mod internal;
+pub mod internal;
 pub mod os;
 use self::internal::{InternalWindow, CallbackData, WindowData, CALLBACK_DATA};
 
@@ -10,7 +10,6 @@ use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
 use std::thread;
 
-use CursorType;
 use config::WindowConfig;
 use event::Event;
 
@@ -31,7 +30,7 @@ impl<'o> ReceiverTagged<'o> {
 }
 
 pub struct Window<'o> {
-    internal: InternalWindow,
+    pub internal: InternalWindow,
     event_receiver: Receiver<Event>,
     window_receiver: ReceiverTagged<'o>,
     owner: Option<&'o Window<'o>>
@@ -110,85 +109,21 @@ impl<'o> Window<'o> {
         }
     }
 
-    pub fn set_title(&self, title: &str) {
-        self.internal.set_title(title);
-    }
-
-    #[inline]
-    pub fn show(&self) {
-        self.internal.show();
-    }
-
-    #[inline]
-    pub fn hide(&self) {
-        self.internal.hide();
-    }
-
-    /// Allow the window to take user input. Any newly created window defaults to
-    /// being enabled.
-    #[inline]
-    pub fn enable(&self) {
-        self.internal.enable();
-    }
-
-    /// Disallow the window from taking user input.
-    #[inline]
-    pub fn disable(&self) {
-        self.internal.disable();
-    }
-
-    /// Sets input focus to this window
-    pub fn focus(&self) {
-        self.internal.focus();
-    }
-
-    pub fn get_inner_pos(&self) -> Option<(i32, i32)> {
-        self.internal.get_inner_pos()
-    }
-
-    /// Gets the position of the upper-left corner of the window, including the title bar
-    pub fn get_outer_pos(&self) -> Option<(i32, i32)> {
-        self.internal.get_outer_pos()
-    }
-
-    pub fn get_inner_size(&self) -> Option<(u32, u32)> {
-        self.internal.get_inner_size()
-    }
-
-    pub fn get_outer_size(&self) -> Option<(u32, u32)> {
-        self.internal.get_outer_size()
-    }
-
-    pub fn set_pos(&self, x: i32, y: i32) -> Option<()> {
-        self.internal.set_pos(x, y)
-    }
-
-    pub fn set_inner_size(&self, x: u32, y: u32) -> Option<()> {
-        self.internal.set_inner_size(x, y)
-    }
-
-    pub fn is_active(&self) -> bool {
-        self.internal.is_active()
-    }
-
-    pub fn set_cursor(&self, cursor_type: CursorType) {
-        self.internal.set_cursor(cursor_type);
-    }
-
     /// Sets the cursor position relative to window space. Note that this will fail in a few
     /// conditions:
     ///
     /// * If the window isn't currently active
     /// * If the cursor is outside of the window's client area
+    #[inline]
     pub fn set_cursor_pos(&self, x: i32, y: i32) {
         let cursor_in_client = {
-            let size = match self.get_inner_size() {
+            let size = match self.internal.get_inner_size() {
                 Some(s) => (s.0 as i32, s.1 as i32),
                 None    => return
             };
             let (cx, cy) = self::os::get_cursor_pos();
 
-            let (xmin, ymin) = self.get_inner_pos().unwrap();
+            let (xmin, ymin) = self.internal.get_inner_pos().unwrap();
             let (xmax, ymax) = (xmin + size.0, ymin + size.1);
 
             xmin < cx && cx < xmax &&
@@ -196,14 +131,15 @@ impl<'o> Window<'o> {
         };
 
 
-        if self.is_active() && cursor_in_client {
-            let pos = self.get_inner_pos().unwrap();
+        if self.internal.is_active() && cursor_in_client {
+            let pos = self.internal.get_inner_pos().unwrap();
 
             self::os::set_cursor_pos(x + pos.0, y + pos.1);
         }
     }
 
     /// Get a reference to this window's owner, if the window is owned.
+    #[inline]
     pub fn owner(&self) -> Option<&Window> {
         self.owner.clone()
     }
