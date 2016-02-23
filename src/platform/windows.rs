@@ -8,11 +8,11 @@ use {CursorType, PixelFormat};
 pub struct Window<'o>( win32::Window<'o> );
 
 impl<'o> Window<'o> {
-    pub fn new<'a>(name: &'a str, config: WindowConfig) -> Window<'o> {
+    pub fn new<'a>(name: &'a str, config: &WindowConfig) -> Window<'o> {
         Window( win32::Window::new(name, config) )
     }
 
-    pub fn new_owned<'a>(&'o self, name: &'a str, config: WindowConfig) -> Window<'o> {
+    pub fn new_owned<'a>(&'o self, name: &'a str, config: &WindowConfig) -> Window<'o> {
         Window( self.0.new_owned(name, config) )
     }
 

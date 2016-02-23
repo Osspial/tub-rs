@@ -6,6 +6,7 @@ use user32;
 
 use std::ptr;
 use std::mem;
+use std::sync::Arc;
 use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
 use std::thread;
@@ -33,19 +34,24 @@ pub struct Window<'o> {
     pub wrapper: WindowWrapper,
     event_receiver: Receiver<Event>,
     window_receiver: ReceiverTagged<'o>,
-    owner: Option<&'o Window<'o>>
+    owner: Option<&'o Window<'o>>,
+    /// Used when setting the pixel format on context creation
+    config: WindowConfig
 }
 
 impl<'o> Window<'o> {
     /// Create a new window with the specified title and config
-    pub fn new<'a>(name: &'a str, config: WindowConfig) -> Window<'o> {
+    pub fn new<'a>(name: &'a str, config: &WindowConfig) -> Window<'o> {
         // Channel for the handle to the window
         let (tx, rx) = mpsc::channel();
         let name = name.into();
+        let config = Arc::new(config.clone());
 
+        let config_arc = config.clone();
         thread::spawn(move || {
             unsafe {
-                let wrapper_window = WindowWrapper::new(name, config, None);
+                let wrapper_window = WindowWrapper::new(name, &config_arc, None);
+                mem::drop(config_arc);
 
                 // Event channel
                 let (sx, rx) = mpsc::channel();
@@ -72,7 +78,8 @@ impl<'o> Window<'o> {
             wrapper: wrapper_window,
             event_receiver: receiver,
             window_receiver: ReceiverTagged::Owned(rx),
-            owner: None
+            owner: None,
+            config: Arc::try_unwrap(config).unwrap()
         }
     }
 
@@ -92,11 +99,11 @@ impl<'o> Window<'o> {
     /// when creating a new unowned window, tub spins up a thread to handle receiving
     /// input from the window in a way that does not block the main program's execution.
     /// Owned windows, however, share a thread with their owner. 
-    pub fn new_owned<'a>(&'o self, name: &'a str, config: WindowConfig) -> Window<'o> {
+    pub fn new_owned<'a>(&'o self, name: &'a str, config: &WindowConfig) -> Window<'o> {
         use std::mem::transmute;
 
         unsafe {
-            user32::SendMessageW(self.wrapper.0, wrapper::MSG_NEWOWNEDWINDOW, transmute(&name), transmute(&config));
+            user32::SendMessageW(self.wrapper.0, wrapper::MSG_NEWOWNEDWINDOW, transmute(&name), transmute(config));
 
             let win_data = self.window_receiver.get_ref().recv().unwrap();
 
@@ -104,7 +111,8 @@ impl<'o> Window<'o> {
                 wrapper: win_data.0,
                 event_receiver: win_data.1,
                 window_receiver: ReceiverTagged::Borrowed(self.window_receiver.get_ref()),
-                owner: Some(self)
+                owner: Some(self),
+                config: config.clone()
             }
         }
     }

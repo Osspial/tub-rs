@@ -29,7 +29,7 @@ unsafe impl Sync for WindowWrapper {}
 
 impl WindowWrapper {
     #[inline]
-    pub fn new<'a>(name: String, config: WindowConfig, owner: Option<HWND>) -> WindowWrapper {
+    pub fn new<'a>(name: String, config: &WindowConfig, owner: Option<HWND>) -> WindowWrapper {
         unsafe {
             let class_name = register_window_class();
 
@@ -119,7 +119,7 @@ impl WindowWrapper {
                 user32::SetWindowLongW(window_handle, -16, 0);
             }
 
-            if let Some(p) = config.icon {
+            if let Some(ref p) = config.icon {
                 let path = wide_path(p).as_ptr();
 
                 // Load the 32x32 icon
@@ -766,7 +766,7 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
             // WPARAM and LPARAM parameters, respectively. This turns them into proper pointers
             // and gets the objects from the pointers.
             let name = (*transmute::<WPARAM, &&str>(wparam)).to_string();
-            let config: WindowConfig = transmute::<LPARAM, &WindowConfig>(lparam).clone();
+            let config: &WindowConfig = transmute::<LPARAM, &WindowConfig>(lparam);
 
             let wrapper_window = WindowWrapper::new(name, config, Some(hwnd));
             let (tx, rx) = mpsc::channel();
@@ -840,6 +840,6 @@ fn osstr<'a>(s: &'a str) -> Vec<u16> {
     OsStr::new(s).encode_wide().chain(Some(0).into_iter()).collect::<Vec<_>>()
 }
 
-fn wide_path(path: PathBuf) -> Vec<u16> {
+fn wide_path(path: &PathBuf) -> Vec<u16> {
     path.as_os_str().encode_wide().chain(Some(0).into_iter()).collect::<Vec<_>>()
 }

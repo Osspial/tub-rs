@@ -1,5 +1,9 @@
 use std::default::Default;
 use std::path::PathBuf;
+use std::marker::{Send, Sync};
+
+unsafe impl Send for WindowConfig {}
+unsafe impl Sync for WindowConfig {}
 
 #[derive(Debug, Clone)]
 pub struct WindowConfig {

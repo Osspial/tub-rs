@@ -18,7 +18,7 @@ fn main() {
         .. Default::default()
     };
 
-    let window = platform::Window::new("It's a window!", config.clone());
+    let window = platform::Window::new("It's a window!", &config);
     let window_context = platform::GlContext::new(&window, Default::default());
     unsafe{ window_context.make_current() };
 
@@ -35,7 +35,7 @@ fn main() {
                 Event::KeyInput(PressState::Pressed, VKeyCode::D)   => {
                     match owned_window {
                         None    => { 
-                            let owned = window.new_owned("Owned Window", owned_config.clone());
+                            let owned = window.new_owned("Owned Window", &owned_config);
                             owned.show();
                             owned.owner().unwrap().disable();
                             owned.focus();
