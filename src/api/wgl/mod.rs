@@ -25,7 +25,7 @@ pub struct GlContext<'w> {
 
 impl<'w> GlContext<'w> {
     pub fn new(window: &'w Window, format: PixelFormat) -> GlContext<'w> {
-        let hdc = window.internal.1;
+        let hdc = window.wrapper.1;
 
         if set_pixel_format(hdc, &format) == 0 {
             panic!(format!("Error: {}", ::std::io::Error::last_os_error()));

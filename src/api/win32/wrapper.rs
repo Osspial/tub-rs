@@ -22,14 +22,14 @@ use config::WindowConfig;
 use event::{Event, VKeyCode};
 
 #[derive(Clone)]
-pub struct InternalWindow( pub HWND, pub HDC );
+pub struct WindowWrapper( pub HWND, pub HDC );
 
-unsafe impl Send for InternalWindow {}
-unsafe impl Sync for InternalWindow {}
+unsafe impl Send for WindowWrapper {}
+unsafe impl Sync for WindowWrapper {}
 
-impl InternalWindow {
+impl WindowWrapper {
     #[inline]
-    pub fn new<'a>(name: String, config: WindowConfig, owner: Option<HWND>) -> InternalWindow {
+    pub fn new<'a>(name: String, config: WindowConfig, owner: Option<HWND>) -> WindowWrapper {
         unsafe {
             let class_name = register_window_class();
 
@@ -146,7 +146,7 @@ impl InternalWindow {
                 panic!(format!("Error: {}", ::std::io::Error::last_os_error()));
             }
 
-            InternalWindow( window_handle, hdc )
+            WindowWrapper( window_handle, hdc )
         }
     }
 
@@ -349,7 +349,7 @@ impl InternalWindow {
     }
 }
 
-impl Drop for InternalWindow {
+impl Drop for WindowWrapper {
     fn drop(&mut self) {
         self.kill();
     }
@@ -433,7 +433,7 @@ impl CallbackData {
     }
 }
 
-/// Struct that contains information about the window internal to the callback.
+/// Struct that contains information about the window wrapper to the callback.
 /// Stuff like the raw window and the event sender are only used by the callback
 /// function, and as such they do not need to be exposed. 
 struct WindowDataIntern {
@@ -453,7 +453,7 @@ impl WindowDataIntern {
     }
 }
 
-pub struct WindowData( pub InternalWindow, pub Receiver<Event> );
+pub struct WindowData( pub WindowWrapper, pub Receiver<Event> );
 
 
 pub const MSG_NEWOWNEDWINDOW: UINT = 0xADD;
@@ -768,7 +768,7 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
             let name = (*transmute::<WPARAM, &&str>(wparam)).to_string();
             let config: WindowConfig = transmute::<LPARAM, &WindowConfig>(lparam).clone();
 
-            let internal_window = InternalWindow::new(name, config, Some(hwnd));
+            let wrapper_window = WindowWrapper::new(name, config, Some(hwnd));
             let (tx, rx) = mpsc::channel();
 
             CALLBACK_DATA.with(|data| {
@@ -782,7 +782,7 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
                         None            => return
                     };
 
-                    vector.push(WindowDataIntern::new(internal_window.0, tx));
+                    vector.push(WindowDataIntern::new(wrapper_window.0, tx));
                 }
                 
                 // Get a reference to the window data sender
@@ -791,7 +791,7 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
                     None        => return
                 };
 
-                sender.send(WindowData(internal_window, rx)).ok();
+                sender.send(WindowData(wrapper_window, rx)).ok();
             });
 
             0

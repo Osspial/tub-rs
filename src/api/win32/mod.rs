@@ -1,6 +1,6 @@
-pub mod internal;
+pub mod wrapper;
 pub mod os;
-use self::internal::{InternalWindow, CallbackData, WindowData, CALLBACK_DATA};
+use self::wrapper::{WindowWrapper, CallbackData, WindowData, CALLBACK_DATA};
 
 use user32;
 
@@ -30,7 +30,7 @@ impl<'o> ReceiverTagged<'o> {
 }
 
 pub struct Window<'o> {
-    pub internal: InternalWindow,
+    pub wrapper: WindowWrapper,
     event_receiver: Receiver<Event>,
     window_receiver: ReceiverTagged<'o>,
     owner: Option<&'o Window<'o>>
@@ -45,15 +45,15 @@ impl<'o> Window<'o> {
 
         thread::spawn(move || {
             unsafe {
-                let internal_window = InternalWindow::new(name, config, None);
+                let wrapper_window = WindowWrapper::new(name, config, None);
 
                 // Event channel
                 let (sx, rx) = mpsc::channel();
 
                 CALLBACK_DATA.with(move |sender| {
-                    let callback_data = CallbackData::new(internal_window.0, sx, tx.clone());
+                    let callback_data = CallbackData::new(wrapper_window.0, sx, tx.clone());
 
-                    tx.send(WindowData(internal_window, rx)).unwrap();
+                    tx.send(WindowData(wrapper_window, rx)).unwrap();
                     *sender.borrow_mut() = Some(callback_data);
                 });
 
@@ -66,10 +66,10 @@ impl<'o> Window<'o> {
             }
         });
 
-        let WindowData(internal_window, receiver) = rx.recv().unwrap();
+        let WindowData(wrapper_window, receiver) = rx.recv().unwrap();
 
         Window {
-            internal: internal_window,
+            wrapper: wrapper_window,
             event_receiver: receiver,
             window_receiver: ReceiverTagged::Owned(rx),
             owner: None
@@ -96,12 +96,12 @@ impl<'o> Window<'o> {
         use std::mem::transmute;
 
         unsafe {
-            user32::SendMessageW(self.internal.0, internal::MSG_NEWOWNEDWINDOW, transmute(&name), transmute(&config));
+            user32::SendMessageW(self.wrapper.0, wrapper::MSG_NEWOWNEDWINDOW, transmute(&name), transmute(&config));
 
             let win_data = self.window_receiver.get_ref().recv().unwrap();
 
             Window {
-                internal: win_data.0,
+                wrapper: win_data.0,
                 event_receiver: win_data.1,
                 window_receiver: ReceiverTagged::Borrowed(self.window_receiver.get_ref()),
                 owner: Some(self)
@@ -117,13 +117,13 @@ impl<'o> Window<'o> {
     #[inline]
     pub fn set_cursor_pos(&self, x: i32, y: i32) {
         let cursor_in_client = {
-            let size = match self.internal.get_inner_size() {
+            let size = match self.wrapper.get_inner_size() {
                 Some(s) => (s.0 as i32, s.1 as i32),
                 None    => return
             };
             let (cx, cy) = self::os::get_cursor_pos();
 
-            let (xmin, ymin) = self.internal.get_inner_pos().unwrap();
+            let (xmin, ymin) = self.wrapper.get_inner_pos().unwrap();
             let (xmax, ymax) = (xmin + size.0, ymin + size.1);
 
             xmin < cx && cx < xmax &&
@@ -131,8 +131,8 @@ impl<'o> Window<'o> {
         };
 
 
-        if self.internal.is_active() && cursor_in_client {
-            let pos = self.internal.get_inner_pos().unwrap();
+        if self.wrapper.is_active() && cursor_in_client {
+            let pos = self.wrapper.get_inner_pos().unwrap();
 
             self::os::set_cursor_pos(x + pos.0, y + pos.1);
         }
