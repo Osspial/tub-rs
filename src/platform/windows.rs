@@ -127,6 +127,14 @@ impl<'w> GlContext<'w> {
     pub unsafe fn make_current(&self) {
         self.0.make_current()
     }
+
+    pub fn get_proc_address(&self, proc_name: &str) -> *const () {
+        self.0.get_proc_address(proc_name)
+    }
+
+    pub fn swap_buffers(&self) {
+        self.0.swap_buffers()
+    }
 }
 
 

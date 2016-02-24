@@ -1,3 +1,4 @@
+
 extern crate tub;
 
 use tub::platform;
@@ -21,6 +22,7 @@ fn main() {
     let window = platform::Window::new("It's a window!", &config);
     let window_context = platform::GlContext::new(&window, Default::default());
     unsafe{ window_context.make_current() };
+    println!("{:?}", window_context.get_proc_address("glBufferSubData"));
 
     let mut owned_window: Option<platform::Window> = None;
 

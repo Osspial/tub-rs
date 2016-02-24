@@ -9,11 +9,11 @@ use winapi::winuser::WNDCLASSEXW;
 use std::ptr;
 use std::mem;
 use std::ops::Drop;
-use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
 use std::path::PathBuf;
 use std::cell::RefCell;
 use std::sync::mpsc::{Sender, Receiver};
+use api::osstr;
 
 use num::FromPrimitive;
 
@@ -834,10 +834,6 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
         _ => user32::DefWindowProcW(hwnd, msg, wparam, lparam)
     }
     
-}
-
-fn osstr<'a>(s: &'a str) -> Vec<u16> {
-    OsStr::new(s).encode_wide().chain(Some(0).into_iter()).collect::<Vec<_>>()
 }
 
 fn wide_path(path: &PathBuf) -> Vec<u16> {

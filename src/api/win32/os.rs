@@ -17,18 +17,22 @@ pub fn get_cursor_pos() -> (i32, i32) {
     }
 }
 
+#[allow(dead_code)]
 pub fn get_highlight_color() -> (u8, u8, u8) {
     color_from_dword(unsafe{ user32::GetSysColor(winapi::COLOR_HIGHLIGHT) })
 }
 
+#[allow(dead_code)]
 pub fn get_inner_highlight_color() -> (u8, u8, u8) {
     color_from_dword(unsafe{ user32::GetSysColor(winapi::COLOR_HIGHLIGHTTEXT) })
 }
 
+#[allow(dead_code)]
 pub fn get_background_color() -> (u8, u8, u8) {
     color_from_dword(unsafe{ user32::GetSysColor(winapi::COLOR_BACKGROUND) })
 }
 
+#[allow(dead_code)]
 fn color_from_dword(color: winapi::DWORD) -> (u8, u8, u8) {
     ((color & 0xFF) as u8, (color >> 8 & 0xFF) as u8, (color >> 16) as u8)
 }
