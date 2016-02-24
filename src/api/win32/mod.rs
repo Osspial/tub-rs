@@ -11,16 +11,17 @@ use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
 use std::thread;
 
+use error::TubResult;
 use config::WindowConfig;
 use event::Event;
 
 enum ReceiverTagged<'o> {
-    Owned(Receiver<WindowData>),
-    Borrowed(&'o Receiver<WindowData>)
+    Owned(Receiver<TubResult<WindowData>>),
+    Borrowed(&'o Receiver<TubResult<WindowData>>)
 }
 
 impl<'o> ReceiverTagged<'o> {
-    fn get_ref(&'o self) -> &'o Receiver<WindowData> {
+    fn get_ref(&'o self) -> &'o Receiver<TubResult<WindowData>> {
         use self::ReceiverTagged::*;
 
         match *self {
@@ -41,7 +42,7 @@ pub struct Window<'o> {
 
 impl<'o> Window<'o> {
     /// Create a new window with the specified title and config
-    pub fn new<'a>(name: &'a str, config: &WindowConfig) -> Window<'o> {
+    pub fn new<'a>(name: &'a str, config: &WindowConfig) -> TubResult<Window<'o>> {
         // Channel for the handle to the window
         let (tx, rx) = mpsc::channel();
         let name = name.into();
@@ -56,12 +57,22 @@ impl<'o> Window<'o> {
                 // Event channel
                 let (sx, rx) = mpsc::channel();
 
-                CALLBACK_DATA.with(move |sender| {
-                    let callback_data = CallbackData::new(wrapper_window.0, sx, tx.clone());
+                match wrapper_window {
+                    Ok(wr) => {
+                        CALLBACK_DATA.with(move |sender| {
+                            let callback_data = CallbackData::new(wr.0, sx, tx.clone());
 
-                    tx.send(WindowData(wrapper_window, rx)).unwrap();
-                    *sender.borrow_mut() = Some(callback_data);
-                });
+                            tx.send(Ok(WindowData(wr, rx))).unwrap();
+                            *sender.borrow_mut() = Some(callback_data);
+                        });
+                    }
+
+                    Err(e) => {
+                        tx.send(Err(e));
+                        panic!("Window creation error: see Result for details");
+                    }
+                }
+                
 
                 let mut msg = mem::uninitialized();
 
@@ -72,15 +83,17 @@ impl<'o> Window<'o> {
             }
         });
 
-        let WindowData(wrapper_window, receiver) = rx.recv().unwrap();
+        let WindowData(wrapper_window, receiver) = try!(rx.recv().unwrap());
 
-        Window {
-            wrapper: wrapper_window,
-            event_receiver: receiver,
-            window_receiver: ReceiverTagged::Owned(rx),
-            owner: None,
-            config: Arc::try_unwrap(config).unwrap()
-        }
+        Ok(
+            Window {
+                wrapper: wrapper_window,
+                event_receiver: receiver,
+                window_receiver: ReceiverTagged::Owned(rx),
+                owner: None,
+                config: Arc::try_unwrap(config).unwrap()
+            }
+        )
     }
 
     /// Creates a window that is owned by the calling window.
@@ -99,21 +112,23 @@ impl<'o> Window<'o> {
     /// when creating a new unowned window, tub spins up a thread to handle receiving
     /// input from the window in a way that does not block the main program's execution.
     /// Owned windows, however, share a thread with their owner. 
-    pub fn new_owned<'a>(&'o self, name: &'a str, config: &WindowConfig) -> Window<'o> {
+    pub fn new_owned<'a>(&'o self, name: &'a str, config: &WindowConfig) -> TubResult<Window<'o>> {
         use std::mem::transmute;
 
         unsafe {
             user32::SendMessageW(self.wrapper.0, wrapper::MSG_NEWOWNEDWINDOW, transmute(&name), transmute(config));
 
-            let win_data = self.window_receiver.get_ref().recv().unwrap();
+            let win_data = try!(self.window_receiver.get_ref().recv().unwrap());
 
-            Window {
-                wrapper: win_data.0,
-                event_receiver: win_data.1,
-                window_receiver: ReceiverTagged::Borrowed(self.window_receiver.get_ref()),
-                owner: Some(self),
-                config: config.clone()
-            }
+            Ok(
+                Window {
+                    wrapper: win_data.0,
+                    event_receiver: win_data.1,
+                    window_receiver: ReceiverTagged::Borrowed(self.window_receiver.get_ref()),
+                    owner: Some(self),
+                    config: config.clone()
+                }
+            )
         }
     }
 

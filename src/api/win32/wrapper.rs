@@ -19,6 +19,7 @@ use num::FromPrimitive;
 
 use CursorType;
 use config::WindowConfig;
+use error::{TubResult, TubError};
 use event::{Event, VKeyCode};
 
 #[derive(Clone)]
@@ -29,7 +30,7 @@ unsafe impl Sync for WindowWrapper {}
 
 impl WindowWrapper {
     #[inline]
-    pub fn new<'a>(name: String, config: &WindowConfig, owner: Option<HWND>) -> WindowWrapper {
+    pub fn new<'a>(name: String, config: &WindowConfig, owner: Option<HWND>) -> TubResult<WindowWrapper> {
         unsafe {
             let class_name = register_window_class();
 
@@ -111,7 +112,7 @@ impl WindowWrapper {
             );
 
             if window_handle == ptr::null_mut() {
-                panic!(format!("Error: {}", ::std::io::Error::last_os_error()));
+                return Err(TubError::OsError(format!("Error: {}", ::std::io::Error::last_os_error())));
             }
 
             // If the window should be borderless, make it borderless
@@ -128,7 +129,7 @@ impl WindowWrapper {
                     user32::SendMessageW(window_handle, winapi::WM_SETICON, winapi::ICON_BIG as u64, icon as winapi::LPARAM);
                 }
                 else {
-                    panic!("Could not load 32x32 icon (TODO: Make this not panic)");
+                    return Err(TubError::IconLoadError(32));
                 }
 
                 // Load the 16x16 icon
@@ -137,16 +138,16 @@ impl WindowWrapper {
                     user32::SendMessageW(window_handle, winapi::WM_SETICON, winapi::ICON_SMALL as u64, icon as winapi::LPARAM);
                 }
                 else {
-                    panic!("Could not load 16x16 icon (TODO: Make this not panic)");
+                    return Err(TubError::IconLoadError(16));
                 }
             }
 
             let hdc = user32::GetDC(window_handle);
             if hdc == ptr::null_mut() {
-                panic!(format!("Error: {}", ::std::io::Error::last_os_error()));
+                return Err(TubError::OsError(format!("Error: {}", ::std::io::Error::last_os_error())));
             }
 
-            WindowWrapper( window_handle, hdc )
+            Ok(WindowWrapper( window_handle, hdc ))
         }
     }
 
@@ -386,7 +387,7 @@ pub struct CallbackData {
     /// A cached index so that the program does not have to search through all of the
     /// window vertex to get the proper window information
     win_index: usize,
-    win_sender: Sender<WindowData>,
+    win_sender: Sender<TubResult<WindowData>>,
     /// The last position of the mouse. This is used to catch duplicate WM_MOUSEHOVER
     /// messages.
     last_mpos: LPARAM
@@ -394,7 +395,7 @@ pub struct CallbackData {
 
 impl CallbackData {
     #[inline]
-    pub fn new(vec_window: HWND, event_sender: Sender<Event>, sender: Sender<WindowData>) -> CallbackData {
+    pub fn new(vec_window: HWND, event_sender: Sender<Event>, sender: Sender<TubResult<WindowData>>) -> CallbackData {
         let mut data_vector = Vec::with_capacity(4);
         data_vector.push(WindowDataIntern::new(vec_window, event_sender));
 
@@ -771,28 +772,26 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
             let wrapper_window = WindowWrapper::new(name, config, Some(hwnd));
             let (tx, rx) = mpsc::channel();
 
-            CALLBACK_DATA.with(|data| {
+            CALLBACK_DATA.with(move |data| {
                 let mut data = data.borrow_mut();
 
-                {
-                    // This block of code gets a reference to the vector of windows and pushes information
-                    // about new window to the top of the vector
-                    let mut vector = match *data {
-                        Some(ref mut v) => &mut v.win_vec,
-                        None            => return
-                    };
+                if let Some(ref mut data) = *data {
+                    match wrapper_window {
+                        Ok(wr) => {
+                            // Add the window data to the win_vec
+                            data.win_vec.push(WindowDataIntern::new(wr.0, tx));
+                            // Send a window data wrapper along the sender                         
+                            data.win_sender.send(Ok(WindowData(wr, rx))).ok();
+                        }
 
-                    vector.push(WindowDataIntern::new(wrapper_window.0, tx));
+                        Err(e) => {
+                            data.win_sender.send(Err(e)).ok();
+                        }
+                    }
                 }
                 
-                // Get a reference to the window data sender
-                let sender = match *data {
-                    Some(ref r) => &r.win_sender,
-                    None        => return
-                };
-
-                sender.send(WindowData(wrapper_window, rx)).ok();
             });
+            
 
             0
         }

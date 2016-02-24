@@ -2,18 +2,21 @@ use std::mem;
 
 use api::win32;
 use api::wgl;
+use error::TubResult;
 use config::WindowConfig;
 use {CursorType, PixelFormat};
 
 pub struct Window<'o>( win32::Window<'o> );
 
 impl<'o> Window<'o> {
-    pub fn new<'a>(name: &'a str, config: &WindowConfig) -> Window<'o> {
-        Window( win32::Window::new(name, config) )
+    pub fn new<'a>(name: &'a str, config: &WindowConfig) -> TubResult<Window<'o>> {
+        // Because this struct is just a bitwise-equivalent wrapper around a win32 window, we can
+        // just transmute the reference to the result.
+        unsafe{ mem::transmute(win32::Window::new(name, config)) }
     }
 
-    pub fn new_owned<'a>(&'o self, name: &'a str, config: &WindowConfig) -> Window<'o> {
-        Window( self.0.new_owned(name, config) )
+    pub fn new_owned<'a>(&'o self, name: &'a str, config: &WindowConfig) -> TubResult<Window<'o>> {
+        unsafe{ mem::transmute(self.0.new_owned(name, config)) }
     }
 
     #[inline]
@@ -98,12 +101,7 @@ impl<'o> Window<'o> {
 
     #[inline]
     pub fn owner(&self) -> Option<&Window> {
-        match self.0.owner() {
-            // Because this struct is just a bitwise-equivalent wrapper around a win32 window, we can
-            // just transmute the reference to the wrapper window.
-            Some(w) => Some(unsafe{ mem::transmute(w) }),
-            None    => None
-        }
+        unsafe{ mem::transmute(self.0.owner()) }
     }
 
     #[inline]
@@ -120,11 +118,11 @@ impl<'o> Window<'o> {
 pub struct GlContext<'w> ( wgl::GlContext<'w> );
 
 impl<'w> GlContext<'w> {
-    pub fn new(window: &'w Window, format: PixelFormat) -> GlContext<'w> {
-        GlContext( wgl::GlContext::new(&window.0, format) )
+    pub fn new(window: &'w Window, format: PixelFormat) -> TubResult<GlContext<'w>> {
+        unsafe{ mem::transmute(wgl::GlContext::new(&window.0, format)) }
     }
 
-    pub unsafe fn make_current(&self) {
+    pub unsafe fn make_current(&self) -> TubResult<()> {
         self.0.make_current()
     }
 

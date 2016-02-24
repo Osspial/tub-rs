@@ -15,6 +15,7 @@ use std::marker::PhantomData;
 use self::gl::wgl;
 use api::osstr;
 use api::win32::Window;
+use error::{TubResult, TubError};
 use PixelFormat;
 
 pub struct GlContext<'w> {
@@ -28,16 +29,16 @@ pub struct GlContext<'w> {
 }
 
 impl<'w> GlContext<'w> {
-    pub fn new(window: &'w Window, format: PixelFormat) -> GlContext<'w> {
+    pub fn new(window: &'w Window, format: PixelFormat) -> TubResult<GlContext<'w>> {
         let hdc = window.wrapper.1;
 
         if set_pixel_format(hdc, &format) == 0 {
-            panic!(format!("Error: {}", ::std::io::Error::last_os_error()));
+            return Err(TubError::OsError(format!("Error: {}", ::std::io::Error::last_os_error())));
         }
 
         let context = unsafe{ wgl::CreateContext(hdc as *const c_void) };
         if context == ptr::null_mut() {
-            panic!(format!("Error: {}", ::std::io::Error::last_os_error()));
+            return Err(TubError::OsError(format!("Error: {}", ::std::io::Error::last_os_error())));
         }
 
         let gl_library = unsafe{
@@ -45,24 +46,27 @@ impl<'w> GlContext<'w> {
             let library = kernel32::LoadLibraryW(name.as_ptr());
 
             if library == ptr::null_mut() {
-                panic!(format!("Error: {}", ::std::io::Error::last_os_error()));
+                return Err(TubError::OsError(format!("Error: {}", ::std::io::Error::last_os_error())));
             }
 
             library
         };
 
-        GlContext {
-            hdc: hdc,
-            context: context as HGLRC,
-            gl_library: gl_library,
-            phantom: PhantomData
-        }
+        Ok(
+            GlContext {
+                hdc: hdc,
+                context: context as HGLRC,
+                gl_library: gl_library,
+                phantom: PhantomData
+            }
+        )
     }
 
-    pub unsafe fn make_current(&self) {
+    pub unsafe fn make_current(&self) -> TubResult<()> {
         if wgl::MakeCurrent(self.hdc as *const c_void, self.context as *const c_void) == 0 {
-            panic!(format!("Error: {}", ::std::io::Error::last_os_error()));
+            return Err(TubError::OsError(format!("Error: {}", ::std::io::Error::last_os_error())));
         }
+        Ok(())
     }
 
     pub fn get_proc_address(&self, proc_name: &str) -> *const () {

@@ -9,6 +9,7 @@ mod api;
 pub mod platform;
 pub mod event;
 pub mod config;
+pub mod error;
 
 use std::default::Default;
 
