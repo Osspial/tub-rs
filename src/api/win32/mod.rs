@@ -68,8 +68,8 @@ impl<'o> Window<'o> {
                     }
 
                     Err(e) => {
-                        tx.send(Err(e));
-                        panic!("Window creation error: see Result for details");
+                        tx.send(Err(e)).unwrap();
+                        panic!("Window creation error: see sent result for details");
                     }
                 }
                 

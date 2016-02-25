@@ -29,8 +29,10 @@ fn main() {
             gl_generator::Fallbacks::All,
             khronos_api::WGL_XML,
             vec![
-                "WGL_ARB_pixel_format".to_string(),
                 "WGL_ARB_extensions_string".to_string(),
+                "WGL_ARB_create_context".to_string(),
+                "WGL_ARB_create_context_profile".to_string(),
+                "WGL_ARB_pixel_format".to_string(),
                 "WGL_ARB_pixel_format_float".to_string(),
                 "WGL_ARB_framebuffer_sRGB".to_string(),
                 "WGL_ARB_multisample".to_string()

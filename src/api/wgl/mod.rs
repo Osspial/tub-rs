@@ -9,10 +9,11 @@ use gdi32;
 use kernel32;
 
 use std::os::raw::c_void;
-use std::ffi::CString;
+use std::ffi::{CString};
 use std::marker::PhantomData;
 
 use self::gl::wgl;
+use self::gl::wgl_ex;
 use api::osstr;
 use api::win32::Window;
 use error::{TubResult, TubError};
@@ -32,25 +33,34 @@ impl<'w> GlContext<'w> {
     pub fn new(window: &'w Window, format: PixelFormat) -> TubResult<GlContext<'w>> {
         let hdc = window.wrapper.1;
 
-        if set_pixel_format(hdc, &format) == 0 {
-            return Err(TubError::OsError(format!("Error: {}", ::std::io::Error::last_os_error())));
-        }
+        if set_pixel_format(hdc, &format) == 0 { return Err(TubError::OsError(format!("Error: {}", ::std::io::Error::last_os_error()))) }
 
         let context = unsafe{ wgl::CreateContext(hdc as *const c_void) };
-        if context == ptr::null_mut() {
-            return Err(TubError::OsError(format!("Error: {}", ::std::io::Error::last_os_error())));
-        }
+        if context == ptr::null_mut() { return Err(TubError::OsError(format!("Error: {}", ::std::io::Error::last_os_error()))) }
 
         let gl_library = unsafe{
             let name = osstr("opengl32.dll");
             let library = kernel32::LoadLibraryW(name.as_ptr());
 
-            if library == ptr::null_mut() {
-                return Err(TubError::OsError(format!("Error: {}", ::std::io::Error::last_os_error())));
-            }
+            if library == ptr::null_mut() { return Err(TubError::OsError(format!("Error: {}", ::std::io::Error::last_os_error()))) }
 
             library
         };
+
+
+        // Gets the current hdc and gl context to restore after loading the functions
+        let (last_hdc, last_context) = unsafe{ (wgl::GetCurrentDC(), wgl::GetCurrentContext()) };
+
+        // wglMakeCurrent requires an OpenGL context to be current, so this makes the newly created
+        // one the current one. After the function pointers have been loaded, the program resets the
+        // context to whatever it was previously.
+        unsafe{ wgl::MakeCurrent(hdc as *const _, context as *const _) };
+
+        // Load the wgl functions that might not be defined
+        let wgl_ex_fns = wgl_ex::Wgl::load_with(|s| get_proc_address(gl_library, s) as *const _);
+
+        // Reset the context to what it was last
+        unsafe{ wgl::MakeCurrent(last_hdc as *const _, last_context as *const _) };
 
         Ok(
             GlContext {
@@ -70,22 +80,35 @@ impl<'w> GlContext<'w> {
     }
 
     pub fn get_proc_address(&self, proc_name: &str) -> *const () {
-        unsafe {
-            let proc_addr = wgl::GetProcAddress(CString::new(proc_name.as_bytes()).unwrap().as_ptr()) as *const _;
-
-            match proc_addr as isize {
-                0  |
-                0x1|
-                0x2|
-                0x3|
-                -1  => kernel32::GetProcAddress(self.gl_library, proc_addr as *const i8) as *const (),
-                _   => proc_addr
-            }
-        }
+        get_proc_address(self.gl_library, proc_name)
     }
 
     pub fn swap_buffers(&self) {
         unsafe{ gdi32::SwapBuffers(self.hdc) };
+    }
+}
+
+impl<'w> Drop for GlContext<'w> {
+    fn drop(&mut self) {
+        unsafe {
+            wgl::DeleteContext(self.context as *const _);
+        }
+    }
+}
+
+fn get_proc_address(library: HMODULE, proc_name: &str) -> *const () {
+    unsafe {
+        let proc_addr = CString::new(proc_name.as_bytes()).unwrap();
+        let proc_addr = wgl::GetProcAddress(proc_addr.as_ptr()) as *const _;
+
+        match proc_addr as isize {
+            0  |
+            0x1|
+            0x2|
+            0x3|
+            -1  => kernel32::GetProcAddress(library, proc_addr as *const i8) as *const (),
+            _   => proc_addr
+        }
     }
 }
 
