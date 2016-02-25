@@ -760,14 +760,13 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
         }
 
         MSG_NEWOWNEDWINDOW  => {
-            use std::mem::transmute;
             use std::sync::mpsc;
 
             // For this message, pointers to the name and window config are stored in the
             // WPARAM and LPARAM parameters, respectively. This turns them into proper pointers
             // and gets the objects from the pointers.
-            let name = (*transmute::<WPARAM, &&str>(wparam)).to_string();
-            let config: &WindowConfig = transmute::<LPARAM, &WindowConfig>(lparam);
+            let name = (*(wparam as *const &str)).to_string();
+            let config  = &*(lparam as *const WindowConfig);
 
             let wrapper_window = WindowWrapper::new(name, config, Some(hwnd));
             let (tx, rx) = mpsc::channel();

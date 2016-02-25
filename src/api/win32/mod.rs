@@ -2,11 +2,11 @@ pub mod wrapper;
 pub mod os;
 use self::wrapper::{WindowWrapper, CallbackData, WindowData, CALLBACK_DATA};
 
+use winapi;
 use user32;
 
 use std::ptr;
 use std::mem;
-use std::sync::Arc;
 use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
 use std::thread;
@@ -36,8 +36,6 @@ pub struct Window<'o> {
     event_receiver: Receiver<Event>,
     window_receiver: ReceiverTagged<'o>,
     owner: Option<&'o Window<'o>>,
-    /// Used when setting the pixel format on context creation
-    config: WindowConfig
 }
 
 impl<'o> Window<'o> {
@@ -46,13 +44,12 @@ impl<'o> Window<'o> {
         // Channel for the handle to the window
         let (tx, rx) = mpsc::channel();
         let name = name.into();
-        let config = Arc::new(config.clone());
+        let config = config.clone();
 
-        let config_arc = config.clone();
         thread::spawn(move || {
             unsafe {
-                let wrapper_window = WindowWrapper::new(name, &config_arc, None);
-                mem::drop(config_arc);
+                let wrapper_window = WindowWrapper::new(name, &config, None);
+                mem::drop(config);
 
                 // Event channel
                 let (sx, rx) = mpsc::channel();
@@ -91,7 +88,6 @@ impl<'o> Window<'o> {
                 event_receiver: receiver,
                 window_receiver: ReceiverTagged::Owned(rx),
                 owner: None,
-                config: Arc::try_unwrap(config).unwrap()
             }
         )
     }
@@ -113,10 +109,8 @@ impl<'o> Window<'o> {
     /// input from the window in a way that does not block the main program's execution.
     /// Owned windows, however, share a thread with their owner. 
     pub fn new_owned<'a>(&'o self, name: &'a str, config: &WindowConfig) -> TubResult<Window<'o>> {
-        use std::mem::transmute;
-
         unsafe {
-            user32::SendMessageW(self.wrapper.0, wrapper::MSG_NEWOWNEDWINDOW, transmute(&name), transmute(config));
+            user32::SendMessageW(self.wrapper.0, wrapper::MSG_NEWOWNEDWINDOW, &name as *const _ as winapi::WPARAM, config as *const _ as winapi::LPARAM);
 
             let win_data = try!(self.window_receiver.get_ref().recv().unwrap());
 
@@ -126,7 +120,6 @@ impl<'o> Window<'o> {
                     event_receiver: win_data.1,
                     window_receiver: ReceiverTagged::Borrowed(self.window_receiver.get_ref()),
                     owner: Some(self),
-                    config: config.clone()
                 }
             )
         }

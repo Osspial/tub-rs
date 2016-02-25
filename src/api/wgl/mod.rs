@@ -59,7 +59,7 @@ impl<'w> GlContext<'w> {
         // Load the wgl functions that might not be defined
         let wgl_ex_fns = wgl_ex::Wgl::load_with(|s| get_proc_address(gl_library, s) as *const _);
 
-        // Reset the context to what it was last
+        // Reset the context to what it was before loading the functions
         unsafe{ wgl::MakeCurrent(last_hdc as *const _, last_context as *const _) };
 
         Ok(
