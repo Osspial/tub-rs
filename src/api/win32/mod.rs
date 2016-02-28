@@ -7,6 +7,7 @@ use user32;
 
 use std::ptr;
 use std::mem;
+use std::sync::Arc;
 use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
 use std::thread;
@@ -36,6 +37,8 @@ pub struct Window<'o> {
     event_receiver: Receiver<Event>,
     window_receiver: ReceiverTagged<'o>,
     owner: Option<&'o Window<'o>>,
+    /// Used when setting the pixel format on context creation
+    pub config: WindowConfig
 }
 
 impl<'o> Window<'o> {
@@ -44,12 +47,13 @@ impl<'o> Window<'o> {
         // Channel for the handle to the window
         let (tx, rx) = mpsc::channel();
         let name = name.into();
-        let config = config.clone();
+        let config = Arc::new(config.clone());
 
+        let config_arc = config.clone();
         thread::spawn(move || {
             unsafe {
-                let wrapper_window = WindowWrapper::new(name, &config, None);
-                mem::drop(config);
+                let wrapper_window = WindowWrapper::new(name, &config_arc, None);
+                mem::drop(config_arc);
 
                 // Event channel
                 let (sx, rx) = mpsc::channel();
@@ -88,6 +92,7 @@ impl<'o> Window<'o> {
                 event_receiver: receiver,
                 window_receiver: ReceiverTagged::Owned(rx),
                 owner: None,
+                config: Arc::try_unwrap(config).unwrap()
             }
         )
     }
@@ -120,6 +125,7 @@ impl<'o> Window<'o> {
                     event_receiver: win_data.1,
                     window_receiver: ReceiverTagged::Borrowed(self.window_receiver.get_ref()),
                     owner: Some(self),
+                    config: config.clone()
                 }
             )
         }

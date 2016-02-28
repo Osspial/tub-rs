@@ -284,9 +284,9 @@ impl WindowWrapper {
 
             user32::AdjustWindowRectEx(
                 &mut rect,
-                user32::GetWindowLongW(self.0, -16) as u32, // Get the window's style
+                self.get_style(),
                 0,
-                user32::GetWindowLongW(self.0, -20) as u32  // Get the window's extended style
+                self.get_style_ex()
             );
 
             let result = user32::SetWindowPos(
@@ -306,6 +306,7 @@ impl WindowWrapper {
         }
     }
 
+    #[inline]
     pub fn is_active(&self) -> bool {
         unsafe {
             let mut is_active = false;
@@ -341,6 +342,14 @@ impl WindowWrapper {
             let cursor = user32::LoadCursorW(ptr::null_mut(), cursor_type);
             user32::SendMessageW(self.0, MSG_SETCURSOR, cursor as u64, 0);
         }
+    }
+
+    pub fn get_style(&self) -> u32{
+        unsafe{ user32::GetWindowLongW(self.0, -16) as u32 }
+    }
+
+    pub fn get_style_ex(&self) -> u32 {
+        unsafe{ user32::GetWindowLongW(self.0, -20) as u32 }
     }
 
     pub fn kill(&self) {

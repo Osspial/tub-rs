@@ -35,7 +35,9 @@ pub enum CursorType {
 pub struct PixelFormat {
     pub color_bits: u8,
     pub depth_bits: u8,
-    pub stencil_bits: u8
+    pub stencil_bits: u8,
+    pub srgb: bool,
+    pub color_buffer_float: bool,
 }
 
 impl Default for PixelFormat {
@@ -43,7 +45,9 @@ impl Default for PixelFormat {
         PixelFormat {
             color_bits: 32,
             depth_bits: 0,
-            stencil_bits: 0
+            stencil_bits: 0,
+            srgb: true,
+            color_buffer_float: false
         }
     }
 }
