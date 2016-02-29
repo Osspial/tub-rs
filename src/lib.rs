@@ -34,6 +34,7 @@ pub enum CursorType {
 #[derive(Debug, Clone, Copy)]
 pub struct PixelFormat {
     pub color_bits: u8,
+    pub alpha_bits: u8,
     pub depth_bits: u8,
     pub stencil_bits: u8,
     pub srgb: bool,
@@ -44,6 +45,7 @@ impl Default for PixelFormat {
     fn default() -> PixelFormat {
         PixelFormat {
             color_bits: 32,
+            alpha_bits: 8,
             depth_bits: 0,
             stencil_bits: 0,
             srgb: true,

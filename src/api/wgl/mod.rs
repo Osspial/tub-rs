@@ -87,6 +87,7 @@ impl<'w> GlContext<'w> {
                             wgl_ex::SUPPORT_OPENGL_ARB, 1,
                             wgl_ex::DOUBLE_BUFFER_ARB, 1,
                             wgl_ex::COLOR_BITS_ARB, format.color_bits as u32,
+                            wgl_ex::ALPHA_BITS_ARB, format.alpha_bits as u32,
                             wgl_ex::DEPTH_BITS_ARB, format.depth_bits as u32,
                             wgl_ex::STENCIL_BITS_ARB, format.stencil_bits as u32
                         ];
@@ -115,6 +116,7 @@ impl<'w> GlContext<'w> {
                         }
                     }
 
+                    // The attributes list must end with a zero, so this makes it end with a zero
                     attrs.push(0);
 
 
@@ -182,15 +184,16 @@ impl<'w> Drop for GlContext<'w> {
 
 fn get_proc_address(library: HMODULE, proc_name: &str) -> *const () {
     unsafe {
-        let proc_addr = CString::new(proc_name.as_bytes()).unwrap();
-        let proc_addr = wgl::GetProcAddress(proc_addr.as_ptr()) as *const _;
+        let proc_name = CString::new(proc_name.as_bytes()).unwrap();
+        let proc_name = proc_name.as_ptr();
+        let proc_addr = wgl::GetProcAddress(proc_name) as *const _;
 
         match proc_addr as isize {
             0  |
             0x1|
             0x2|
             0x3|
-            -1  => kernel32::GetProcAddress(library, proc_addr as *const i8) as *const (),
+            -1  => kernel32::GetProcAddress(library, proc_name) as *const (),
             _   => proc_addr
         }
     }
@@ -203,6 +206,7 @@ unsafe fn get_dummy_pixel_format(hdc: HDC, format: &PixelFormat) -> TubResult<i3
     pfd.dwFlags = winapi::PFD_DRAW_TO_WINDOW | winapi::PFD_SUPPORT_OPENGL | winapi::PFD_DOUBLEBUFFER;
     pfd.iPixelType = winapi::PFD_TYPE_RGBA;
     pfd.cColorBits = format.color_bits;
+    pfd.cAlphaBits = format.alpha_bits;
     pfd.cDepthBits = format.depth_bits;
     pfd.cStencilBits = format.stencil_bits;
     pfd.iLayerType = winapi::PFD_MAIN_PLANE;
