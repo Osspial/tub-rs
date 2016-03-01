@@ -26,6 +26,9 @@ pub struct WindowConfig {
     /// Whether or not the window appears on the taskbar
     pub tool_window: bool,
 
+    /// Whether or not the window can be transparent
+    pub transparent: bool,
+
     /// The initial state of the window
     pub initial_state: InitialState,
 
@@ -45,6 +48,8 @@ impl Default for WindowConfig {
             maximizable: true,
             minimizable: true,
             tool_window: false,
+
+            transparent: false,
 
             initial_state: InitialState::Windowed,
 

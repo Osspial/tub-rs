@@ -102,19 +102,25 @@ impl<'w> GlContext<'w> {
                         }
                     }
 
-                    if format.srgb {
+                    if let Some(srgb) = format.srgb {
                         if extns.contains("WGL_ARB_framebuffer_sRGB") {
                             attrs.push(wgl_ex::FRAMEBUFFER_SRGB_CAPABLE_ARB);
-                            attrs.push(1);
                         }
                         else if extns.contains("WGL_EXT_framebuffer_sRGB") {
                             attrs.push(wgl_ex::FRAMEBUFFER_SRGB_CAPABLE_EXT);
-                            attrs.push(1);
                         }
                         else {
                             return Err(TubError::ContextCreationError("Could not create SRGB pixel format".to_string()));
                         }
+
+                        match srgb {
+                            true  => attrs.push(1),
+                            false => attrs.push(0)
+                        }
                     }
+
+                    attrs.push(wgl_ex::TRANSPARENT_ARB);
+                    attrs.push(1);
 
                     // The attributes list must end with a zero, so this makes it end with a zero
                     attrs.push(0);

@@ -4,6 +4,7 @@ extern crate winapi;
 extern crate user32;
 extern crate gdi32;
 extern crate kernel32;
+extern crate dwmapi;
 
 mod api;
 pub mod platform;
@@ -37,7 +38,7 @@ pub struct PixelFormat {
     pub alpha_bits: u8,
     pub depth_bits: u8,
     pub stencil_bits: u8,
-    pub srgb: bool,
+    pub srgb: Option<bool>,
     pub color_buffer_float: bool,
 }
 
@@ -48,7 +49,7 @@ impl Default for PixelFormat {
             alpha_bits: 8,
             depth_bits: 0,
             stencil_bits: 0,
-            srgb: true,
+            srgb: None,
             color_buffer_float: false
         }
     }

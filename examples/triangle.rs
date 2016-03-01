@@ -16,15 +16,20 @@ gfx_vertex_struct!( Vertex {
 
 gfx_pipeline!(pipe {
     vbuf: gfx::VertexBuffer<Vertex> = (),
-    out: gfx::RenderTarget<gfx::format::Srgb8> = "o_Color",
+    out: gfx::RenderTarget<gfx::format::Srgba8> = "o_Color",
 });
 
 fn main() {
     use gfx::traits::{Device, FactoryExt};
 
-    let window = Window::new("Windowy shit", &Default::default()).unwrap();
+    let window_config = tub::config::WindowConfig {
+        borderless: false,
+        transparent: true,
+        .. Default::default()
+    };
+    let window = Window::new("Windowy shit", &window_config).unwrap();
     let (context, mut device, mut factory, main_color, _) =
-        init::<gfx::format::Srgb8, gfx::format::Depth>(&window);
+        init::<gfx::format::Srgba8, gfx::format::Depth>(&window);
     let mut encoder = factory.create_encoder();
 
     let pso = factory.create_pipeline_simple(
@@ -57,7 +62,7 @@ fn main() {
         }
 
         encoder.reset();
-        encoder.clear(&data.out, [0.1, 0.2, 0.3]);
+        encoder.clear(&data.out, [0.0, 0.0, 0.0, 0.0]);
         encoder.draw(&slice, &pso, &data);
 
         device.submit(encoder.as_buffer());
@@ -120,7 +125,7 @@ fn init_raw<'w>(window: &'w tub::platform::Window,
             stencil_bits: stencil_bits,
             color_bits: color_total_bits - alpha_bits,
             alpha_bits: alpha_bits,
-            srgb: color_format.1 == format::ChannelType::Srgb,
+            srgb: Some(color_format.1 == format::ChannelType::Srgb),
             ..Default::default()
         };
 

@@ -1,6 +1,7 @@
 use winapi;
 use user32;
 use kernel32;
+use dwmapi;
 
 use winapi::{UINT, DWORD, WPARAM, LPARAM};
 use winapi::windef::{HWND, HDC};
@@ -118,6 +119,17 @@ impl WindowWrapper {
             // If the window should be borderless, make it borderless
             if config.borderless {
                 user32::SetWindowLongW(window_handle, -16, 0);
+            }
+
+            if config.transparent {
+                let blur_options = winapi::DWM_BLURBEHIND {
+                    dwFlags: 0x01,
+                    fEnable: 1,
+                    hRgnBlur: ptr::null_mut(),
+                    fTransitionOnMaximized: 0
+                };
+
+                dwmapi::DwmEnableBlurBehindWindow(window_handle, &blur_options);
             }
 
             if let Some(ref p) = config.icon {
