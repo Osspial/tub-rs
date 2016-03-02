@@ -19,8 +19,8 @@ fn main() {
         .. Default::default()
     };
 
-    let window = platform::Window::new("It's a window!", &config).unwrap();
-    let window_context = platform::GlContext::new(&window, Default::default()).unwrap();
+    let window = platform::Window::new("It's a window!", config, Default::default()).unwrap();
+    let window_context = platform::GlContext::new(&window).unwrap();
     unsafe{ window_context.make_current().unwrap() };
 
     let mut owned_window: Option<platform::Window> = None;
@@ -36,7 +36,7 @@ fn main() {
                 Event::KeyInput(PressState::Pressed, VKeyCode::D)   => {
                     match owned_window {
                         None    => { 
-                            let owned = window.new_owned("Owned Window", &owned_config).unwrap();
+                            let owned = window.new_owned("Owned Window", owned_config.clone(), Default::default()).unwrap();
                             owned.show();
                             owned.owner().unwrap().disable();
                             owned.focus();

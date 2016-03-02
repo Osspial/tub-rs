@@ -13,7 +13,7 @@ use std::sync::mpsc::Receiver;
 use std::thread;
 
 use error::TubResult;
-use config::WindowConfig;
+use config::{WindowConfig, PixelFormat};
 use event::Event;
 
 enum ReceiverTagged<'o> {
@@ -38,20 +38,28 @@ pub struct Window<'o> {
     window_receiver: ReceiverTagged<'o>,
     owner: Option<&'o Window<'o>>,
     /// Used when setting the pixel format on context creation
-    pub config: WindowConfig
+    config: WindowConfig,
+    pixel_format: PixelFormat
 }
 
 impl<'o> Window<'o> {
     /// Create a new window with the specified title and config
-    pub fn new<'a>(name: &'a str, config: &WindowConfig) -> TubResult<Window<'o>> {
+    pub fn new<'a>(name: &'a str, config: WindowConfig, pixel_format: PixelFormat) -> TubResult<Window<'o>> {
         // Channel for the handle to the window
         let (tx, rx) = mpsc::channel();
-        let name = name.into();
-        let config = Arc::new(config.clone());
+        let config = Arc::new(config);
+
+        let name_raw = RawSlice(name.as_ptr(), name.len());
 
         let config_arc = config.clone();
         thread::spawn(move || {
             unsafe {
+                use std::{slice, str};
+
+                let name = str::from_utf8(
+                    slice::from_raw_parts(name_raw.0, name_raw.1)
+                ).unwrap();
+
                 let wrapper_window = WindowWrapper::new(name, &config_arc, None);
                 mem::drop(config_arc);
 
@@ -92,7 +100,8 @@ impl<'o> Window<'o> {
                 event_receiver: receiver,
                 window_receiver: ReceiverTagged::Owned(rx),
                 owner: None,
-                config: Arc::try_unwrap(config).unwrap()
+                config: Arc::try_unwrap(config).unwrap(),
+                pixel_format: pixel_format
             }
         )
     }
@@ -113,9 +122,9 @@ impl<'o> Window<'o> {
     /// when creating a new unowned window, tub spins up a thread to handle receiving
     /// input from the window in a way that does not block the main program's execution.
     /// Owned windows, however, share a thread with their owner. 
-    pub fn new_owned<'a>(&'o self, name: &'a str, config: &WindowConfig) -> TubResult<Window<'o>> {
+    pub fn new_owned<'a>(&'o self, name: &'a str, config: WindowConfig, pixel_format: PixelFormat) -> TubResult<Window<'o>> {
         unsafe {
-            user32::SendMessageW(self.wrapper.0, wrapper::MSG_NEWOWNEDWINDOW, &name as *const _ as winapi::WPARAM, config as *const _ as winapi::LPARAM);
+            user32::SendMessageW(self.wrapper.0, wrapper::MSG_NEWOWNEDWINDOW, &name as *const _ as winapi::WPARAM, &config as *const _ as winapi::LPARAM);
 
             let win_data = try!(self.window_receiver.get_ref().recv().unwrap());
 
@@ -125,7 +134,8 @@ impl<'o> Window<'o> {
                     event_receiver: win_data.1,
                     window_receiver: ReceiverTagged::Borrowed(self.window_receiver.get_ref()),
                     owner: Some(self),
-                    config: config.clone()
+                    config: config.clone(),
+                    pixel_format: pixel_format
                 }
             )
         }
@@ -179,6 +189,14 @@ impl<'o> Window<'o> {
             window: self
         }
     }
+
+    pub fn config(&self) -> &WindowConfig {
+        &self.config
+    }
+
+    pub fn pixel_format(&self) -> &PixelFormat {
+        &self.pixel_format
+    }
 }
 
 pub struct PollEventsIter<'w> {
@@ -204,3 +222,6 @@ impl<'w> Iterator for WaitEventsIter<'w> {
         self.window.event_receiver.recv().ok()
     }
 }
+
+struct RawSlice (*const u8, usize);
+unsafe impl Send for RawSlice {}

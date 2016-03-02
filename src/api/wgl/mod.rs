@@ -17,8 +17,9 @@ use self::gl::wgl;
 use self::gl::wgl_ex;
 use api::osstr;
 use api::win32::Window;
+use api::win32::wrapper::WindowWrapper;
 use error::{TubResult, TubError};
-use PixelFormat;
+use config::PixelFormat;
 
 pub struct GlContext<'w> {
     hdc: HDC,
@@ -31,17 +32,19 @@ pub struct GlContext<'w> {
 }
 
 impl<'w> GlContext<'w> {
-    pub fn new(window: &'w Window, format: PixelFormat) -> TubResult<GlContext<'w>> {
+    pub fn new(window: &'w Window) -> TubResult<GlContext<'w>> {
         unsafe {
             // Gets the current hdc and gl context to restore after loading the context creation functions
             let (last_hdc, last_context) = (wgl::GetCurrentDC(), wgl::GetCurrentContext());
             let hdc = window.wrapper.1;
 
             let (context, gl_library) = {
-                let dummy_window = try!(Window::new("A window, dummy", &window.config));
-                let d_hdc = dummy_window.wrapper.1;
+                let pixel_format = window.pixel_format();
 
-                try!(set_pixel_format(d_hdc, try!(get_dummy_pixel_format(d_hdc, &format))));
+                let dummy_window = try!(WindowWrapper::new("A window, dummy", window.config(), None));
+                let d_hdc = dummy_window.1;
+
+                try!(set_pixel_format(d_hdc, try!(get_dummy_pixel_format(d_hdc, &pixel_format))));
 
                 // Create the dummy context
                 let d_context = wgl::CreateContext(d_hdc as *const c_void);
@@ -86,13 +89,13 @@ impl<'w> GlContext<'w> {
                             wgl_ex::DRAW_TO_WINDOW_ARB, 1,
                             wgl_ex::SUPPORT_OPENGL_ARB, 1,
                             wgl_ex::DOUBLE_BUFFER_ARB, 1,
-                            wgl_ex::COLOR_BITS_ARB, format.color_bits as u32,
-                            wgl_ex::ALPHA_BITS_ARB, format.alpha_bits as u32,
-                            wgl_ex::DEPTH_BITS_ARB, format.depth_bits as u32,
-                            wgl_ex::STENCIL_BITS_ARB, format.stencil_bits as u32
+                            wgl_ex::COLOR_BITS_ARB, pixel_format.color_bits as u32,
+                            wgl_ex::ALPHA_BITS_ARB, pixel_format.alpha_bits as u32,
+                            wgl_ex::DEPTH_BITS_ARB, pixel_format.depth_bits as u32,
+                            wgl_ex::STENCIL_BITS_ARB, pixel_format.stencil_bits as u32
                         ];
 
-                    if format.color_buffer_float {
+                    if pixel_format.color_buffer_float {
                         if extns.contains("WGL_ARB_pixel_format_float") {
                             attrs.push(wgl_ex::TYPE_RGBA_FLOAT_ARB);
                             attrs.push(1);
@@ -102,7 +105,7 @@ impl<'w> GlContext<'w> {
                         }
                     }
 
-                    if let Some(srgb) = format.srgb {
+                    if let Some(srgb) = pixel_format.srgb {
                         if extns.contains("WGL_ARB_framebuffer_sRGB") {
                             attrs.push(wgl_ex::FRAMEBUFFER_SRGB_CAPABLE_ARB);
                         }
@@ -126,14 +129,14 @@ impl<'w> GlContext<'w> {
                     attrs.push(0);
 
 
-                    let mut format = 0;
-                    let mut num_formats = 0;
+                    let mut format_num = 0;
+                    let mut format_count = 0;
                     wgl_ex_fns.ChoosePixelFormatARB(hdc as *const _, 
                                                     attrs.as_ptr() as *const i32, 
                                                     ptr::null(), 1, 
-                                                    &mut format, 
-                                                    &mut num_formats);
-                    try!(set_pixel_format(hdc, format));
+                                                    &mut format_num, 
+                                                    &mut format_count);
+                    try!(set_pixel_format(hdc, format_num));
                     
                     let context = 
                         wgl_ex_fns.CreateContextAttribsARB(hdc as *const _,
@@ -205,16 +208,16 @@ fn get_proc_address(library: HMODULE, proc_name: &str) -> *const () {
     }
 }
 
-unsafe fn get_dummy_pixel_format(hdc: HDC, format: &PixelFormat) -> TubResult<i32> {
+unsafe fn get_dummy_pixel_format(hdc: HDC, pixel_format: &PixelFormat) -> TubResult<i32> {
     let mut pfd: winapi::PIXELFORMATDESCRIPTOR = mem::zeroed();
     pfd.nSize = mem::size_of::<winapi::PIXELFORMATDESCRIPTOR>() as winapi::WORD;
     pfd.nVersion = 1;
     pfd.dwFlags = winapi::PFD_DRAW_TO_WINDOW | winapi::PFD_SUPPORT_OPENGL | winapi::PFD_DOUBLEBUFFER;
     pfd.iPixelType = winapi::PFD_TYPE_RGBA;
-    pfd.cColorBits = format.color_bits;
-    pfd.cAlphaBits = format.alpha_bits;
-    pfd.cDepthBits = format.depth_bits;
-    pfd.cStencilBits = format.stencil_bits;
+    pfd.cColorBits = pixel_format.color_bits;
+    pfd.cAlphaBits = pixel_format.alpha_bits;
+    pfd.cDepthBits = pixel_format.depth_bits;
+    pfd.cStencilBits = pixel_format.stencil_bits;
     pfd.iLayerType = winapi::PFD_MAIN_PLANE;
 
     match gdi32::ChoosePixelFormat(hdc, &pfd) {
