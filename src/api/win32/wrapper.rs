@@ -31,11 +31,11 @@ unsafe impl Sync for WindowWrapper {}
 
 impl WindowWrapper {
     #[inline]
-    pub fn new<'a>(name: &str, config: &WindowConfig, owner: Option<HWND>) -> TubResult<WindowWrapper> {
+    pub fn new<'a>(config: &WindowConfig, owner: Option<HWND>) -> TubResult<WindowWrapper> {
         unsafe {
             let class_name = register_window_class();
 
-            let window_name = osstr(name);
+            let window_name = osstr(&config.name);
 
             let (style, style_ex) = {
                 use config::InitialState::*;
@@ -783,13 +783,12 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
         MSG_NEWOWNEDWINDOW  => {
             use std::sync::mpsc;
 
-            // For this message, pointers to the name and window config are stored in the
-            // WPARAM and LPARAM parameters, respectively. This turns them into proper pointers
+            // For this message, the pointer to the window config is stored in the
+            // LPARAM parameter. This turns them into proper pointers
             // and gets the objects from the pointers.
-            let name = *(wparam as *const &str);
             let config  = &*(lparam as *const WindowConfig);
 
-            let wrapper_window = WindowWrapper::new(name, config, Some(hwnd));
+            let wrapper_window = WindowWrapper::new(config, Some(hwnd));
             let (tx, rx) = mpsc::channel();
 
             CALLBACK_DATA.with(move |data| {

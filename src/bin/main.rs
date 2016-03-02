@@ -8,18 +8,20 @@ use std::path::Path;
 
 fn main() {
     let config = WindowConfig {
+        name: "It's a window!".to_owned(),
         icon: Some(Path::new("tub.ico").to_path_buf()),
         size: Some((500, 500)),
         .. Default::default()
     };
 
     let owned_config = WindowConfig {
+        name: "Owned Window".to_owned(),
         icon: Some(Path::new("tub.ico").to_path_buf()),
         size: Some((300, 300)),
         .. Default::default()
     };
 
-    let window = platform::Window::new("It's a window!", config, Default::default()).unwrap();
+    let window = platform::Window::new(config, Default::default()).unwrap();
     let window_context = platform::GlContext::new(&window).unwrap();
     unsafe{ window_context.make_current().unwrap() };
 
@@ -36,7 +38,7 @@ fn main() {
                 Event::KeyInput(PressState::Pressed, VKeyCode::D)   => {
                     match owned_window {
                         None    => { 
-                            let owned = window.new_owned("Owned Window", owned_config.clone(), Default::default()).unwrap();
+                            let owned = window.new_owned(owned_config.clone(), Default::default()).unwrap();
                             owned.show();
                             owned.owner().unwrap().disable();
                             owned.focus();

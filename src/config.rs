@@ -7,6 +7,8 @@ unsafe impl Sync for WindowConfig {}
 
 #[derive(Debug, Clone)]
 pub struct WindowConfig {
+    // The window's name
+    pub name: String,
     /// The window's dimensions
     pub size: Option<(i32, i32)>,
 
@@ -39,6 +41,7 @@ pub struct WindowConfig {
 impl Default for WindowConfig {
     fn default() -> WindowConfig {
         WindowConfig {
+            name: String::new(),
             size: None,
 
             topmost: false,

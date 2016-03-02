@@ -44,23 +44,15 @@ pub struct Window<'o> {
 
 impl<'o> Window<'o> {
     /// Create a new window with the specified title and config
-    pub fn new<'a>(name: &'a str, config: WindowConfig, pixel_format: PixelFormat) -> TubResult<Window<'o>> {
+    pub fn new<'a>(config: WindowConfig, pixel_format: PixelFormat) -> TubResult<Window<'o>> {
         // Channel for the handle to the window
         let (tx, rx) = mpsc::channel();
         let config = Arc::new(config);
 
-        let name_raw = RawSlice(name.as_ptr(), name.len());
-
         let config_arc = config.clone();
         thread::spawn(move || {
             unsafe {
-                use std::{slice, str};
-
-                let name = str::from_utf8(
-                    slice::from_raw_parts(name_raw.0, name_raw.1)
-                ).unwrap();
-
-                let wrapper_window = WindowWrapper::new(name, &config_arc, None);
+                let wrapper_window = WindowWrapper::new(&config_arc, None);
                 mem::drop(config_arc);
 
                 // Event channel
@@ -122,9 +114,9 @@ impl<'o> Window<'o> {
     /// when creating a new unowned window, tub spins up a thread to handle receiving
     /// input from the window in a way that does not block the main program's execution.
     /// Owned windows, however, share a thread with their owner. 
-    pub fn new_owned<'a>(&'o self, name: &'a str, config: WindowConfig, pixel_format: PixelFormat) -> TubResult<Window<'o>> {
+    pub fn new_owned<'a>(&'o self, config: WindowConfig, pixel_format: PixelFormat) -> TubResult<Window<'o>> {
         unsafe {
-            user32::SendMessageW(self.wrapper.0, wrapper::MSG_NEWOWNEDWINDOW, &name as *const _ as winapi::WPARAM, &config as *const _ as winapi::LPARAM);
+            user32::SendMessageW(self.wrapper.0, wrapper::MSG_NEWOWNEDWINDOW, 0, &config as *const _ as winapi::LPARAM);
 
             let win_data = try!(self.window_receiver.get_ref().recv().unwrap());
 
@@ -222,6 +214,3 @@ impl<'w> Iterator for WaitEventsIter<'w> {
         self.window.event_receiver.recv().ok()
     }
 }
-
-struct RawSlice (*const u8, usize);
-unsafe impl Send for RawSlice {}

@@ -9,14 +9,14 @@ use CursorType;
 pub struct Window<'o>( win32::Window<'o> );
 
 impl<'o> Window<'o> {
-    pub fn new<'a>(name: &'a str, config: WindowConfig, pixel_format: PixelFormat) -> TubResult<Window<'o>> {
+    pub fn new<'a>(config: WindowConfig, pixel_format: PixelFormat) -> TubResult<Window<'o>> {
         // Because this struct is just a bitwise-equivalent wrapper around a win32 window, we can
         // just transmute the reference to the result.
-        unsafe{ mem::transmute(win32::Window::new(name, config, pixel_format)) }
+        unsafe{ mem::transmute(win32::Window::new(config, pixel_format)) }
     }
 
-    pub fn new_owned<'a>(&'o self, name: &'a str, config: WindowConfig, pixel_format: PixelFormat) -> TubResult<Window<'o>> {
-        unsafe{ mem::transmute(self.0.new_owned(name, config, pixel_format)) }
+    pub fn new_owned<'a>(&'o self, config: WindowConfig, pixel_format: PixelFormat) -> TubResult<Window<'o>> {
+        unsafe{ mem::transmute(self.0.new_owned(config, pixel_format)) }
     }
 
     #[inline]

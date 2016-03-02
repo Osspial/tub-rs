@@ -41,7 +41,7 @@ impl<'w> GlContext<'w> {
             let (context, gl_library) = {
                 let pixel_format = window.pixel_format();
 
-                let dummy_window = try!(WindowWrapper::new("A window, dummy", window.config(), None));
+                let dummy_window = try!(WindowWrapper::new(window.config(), None));
                 let d_hdc = dummy_window.1;
 
                 try!(set_pixel_format(d_hdc, try!(get_dummy_pixel_format(d_hdc, &pixel_format))));
