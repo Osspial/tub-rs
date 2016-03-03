@@ -7,13 +7,6 @@ use tub::event::{Event, PressState, VKeyCode};
 use std::path::Path;
 
 fn main() {
-    let config = WindowConfig {
-        name: "It's a window!".to_owned(),
-        icon: Some(Path::new("tub.ico").to_path_buf()),
-        size: Some((500, 500)),
-        .. Default::default()
-    };
-
     let owned_config = WindowConfig {
         name: "Owned Window".to_owned(),
         icon: Some(Path::new("tub.ico").to_path_buf()),
@@ -21,7 +14,12 @@ fn main() {
         .. Default::default()
     };
 
-    let window = platform::Window::new(config, Default::default()).unwrap();
+    let window = platform::Window::new(
+        WindowConfig::new()
+            .name("It's a window!".to_owned())
+            .icon(Some(Path::new("tub.ico").to_path_buf()))
+            .size(Some((500, 500))),
+        Default::default()).unwrap();
     let window_context = platform::GlContext::new(&window).unwrap();
     unsafe{ window_context.make_current().unwrap() };
 

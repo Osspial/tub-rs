@@ -182,11 +182,11 @@ impl<'o> Window<'o> {
         }
     }
 
-    pub fn config(&self) -> &WindowConfig {
+    pub fn get_config(&self) -> &WindowConfig {
         &self.config
     }
 
-    pub fn pixel_format(&self) -> &PixelFormat {
+    pub fn get_pixel_format(&self) -> &PixelFormat {
         &self.pixel_format
     }
 }

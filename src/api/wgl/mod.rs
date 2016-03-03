@@ -39,9 +39,9 @@ impl<'w> GlContext<'w> {
             let hdc = window.wrapper.1;
 
             let (context, gl_library) = {
-                let pixel_format = window.pixel_format();
+                let pixel_format = window.get_pixel_format();
 
-                let dummy_window = try!(WindowWrapper::new(window.config(), None));
+                let dummy_window = try!(WindowWrapper::new(window.get_config(), None));
                 let d_hdc = dummy_window.1;
 
                 try!(set_pixel_format(d_hdc, try!(get_dummy_pixel_format(d_hdc, &pixel_format))));
@@ -122,8 +122,18 @@ impl<'w> GlContext<'w> {
                         }
                     }
 
-                    attrs.push(wgl_ex::TRANSPARENT_ARB);
-                    attrs.push(1);
+                    if pixel_format.multisampling > 0 {
+                        if extns.contains("WGL_ARB_multisample") {
+                            println!("Enabling multisampling {}", pixel_format.multisampling);
+                            attrs.push(wgl_ex::SAMPLE_BUFFERS_ARB);
+                            attrs.push(1);
+                            attrs.push(wgl_ex::SAMPLES_ARB);
+                            attrs.push(pixel_format.multisampling as u32);
+                        }
+                        else {
+                            return Err(TubError::ContextCreationError("Could not create multisampled pixel format".to_owned()));
+                        }
+                    }
 
                     // The attributes list must end with a zero, so this makes it end with a zero
                     attrs.push(0);

@@ -105,6 +105,16 @@ impl<'o> Window<'o> {
     }
 
     #[inline]
+    pub fn get_config(&self) -> &WindowConfig {
+        self.0.get_config()
+    }
+
+    #[inline]
+    pub fn get_pixel_format(&self) -> &PixelFormat {
+        self.0.get_pixel_format()
+    }
+
+    #[inline]
     pub fn poll_events(&self) -> PollEventsIter {
         self.0.poll_events()
     }

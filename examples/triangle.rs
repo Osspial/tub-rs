@@ -22,14 +22,17 @@ gfx_pipeline!(pipe {
 fn main() {
     use gfx::traits::{Device, FactoryExt};
 
-    let window_config = tub::config::WindowConfig {
-        borderless: false,
-        transparent: true,
-        .. Default::default()
-    };
-    let window = Window::new("Windowy shit", &window_config).unwrap();
+    let window = init_window::<gfx::format::Srgba8, gfx::format::Depth>(
+        tub::config::WindowConfig::new()
+            .name("Triangle".to_owned())
+            .size(Some((500, 500)))
+            .borderless(false),
+        tub::config::PixelFormat::new()
+            .multisampling(16)
+        );
+
     let (context, mut device, mut factory, main_color, _) =
-        init::<gfx::format::Srgba8, gfx::format::Depth>(&window);
+        init_context::<gfx::format::Srgba8, gfx::format::Depth>(&window);
     let mut encoder = factory.create_encoder();
 
     let pso = factory.create_pipeline_simple(
@@ -95,43 +98,44 @@ const TRIANGLE_VERT: &'static str = r#"
     }
 "#;
 
-
-fn init<'w, Cf, Df>(window: &'w tub::platform::Window) ->
-            (tub::platform::GlContext<'w>,
-             gfx_device_gl::Device, gfx_device_gl::Factory,
-             handle::RenderTargetView<R, Cf>, handle::DepthStencilView<R, Df>)
+fn init_window<'w, Cf, Df>(window_config: tub::config::WindowConfig, pixel_format: tub::config::PixelFormat) -> tub::platform::Window<'w>
 where
     Cf: format::RenderFormat,
     Df: format::DepthFormat,
 {
-    use gfx_core::factory::Phantom;
-    let (context, device, factory, color_view, ds_view) = init_raw(window, Cf::get_format(), Df::get_format());
-    (context, device, factory, Phantom::new(color_view), Phantom::new(ds_view))
-}
+    let color_format = Cf::get_format();
+    let ds_format = Df::get_format();
 
-fn init_raw<'w>(window: &'w tub::platform::Window,
-                color_format: format::Format, ds_format: format::Format) ->
-                (tub::platform::GlContext<'w>,
-                gfx_device_gl::Device, gfx_device_gl::Factory,
-                handle::RawRenderTargetView<R>, handle::RawDepthStencilView<R>)
-{
-    let context = {
+    let pix_format = {
         let color_total_bits = color_format.0.get_total_bits();
         let alpha_bits = color_format.0.get_alpha_stencil_bits();
         let depth_total_bits = ds_format.0.get_total_bits();
         let stencil_bits = ds_format.0.get_alpha_stencil_bits();
-        let pix_format = tub::PixelFormat {
+        tub::config::PixelFormat {
             depth_bits: depth_total_bits - stencil_bits,
             stencil_bits: stencil_bits,
             color_bits: color_total_bits - alpha_bits,
             alpha_bits: alpha_bits,
             srgb: Some(color_format.1 == format::ChannelType::Srgb),
-            ..Default::default()
-        };
-
-        let context = tub::platform::GlContext::new(&window, pix_format).unwrap();
-        context
+            ..pixel_format
+        }
     };
+    tub::platform::Window::new(window_config, pix_format).unwrap()
+}
+
+fn init_context<'w, Cf, Df>(window: &'w Window) -> 
+    (tub::platform::GlContext<'w>, gfx_device_gl::Device, 
+    gfx_device_gl::Factory, handle::RenderTargetView<R, Cf>, 
+    handle::DepthStencilView<R, Df>)
+where
+    Cf: format::RenderFormat,
+    Df: format::DepthFormat,
+{
+    use gfx_core::factory::Phantom;
+
+    let color_format = Cf::get_format();
+    let ds_format = Df::get_format();
+    let context = tub::platform::GlContext::new(window).unwrap();
 
     unsafe { context.make_current().unwrap() };
     let (device, factory) = gfx_device_gl::create(|s|
@@ -141,12 +145,11 @@ fn init_raw<'w>(window: &'w tub::platform::Window,
     let dim = get_window_dimensions(&window);
     let (color_view, ds_view) = gfx_device_gl::create_main_targets_raw(dim, color_format.0, ds_format.0);
 
-    // done
-    (context, device, factory, color_view, ds_view)
+    (context, device, factory, Phantom::new(color_view), Phantom::new(ds_view))
 }
 
 fn get_window_dimensions(window: &tub::platform::Window) -> tex::Dimensions {
     let (width, height) = window.get_inner_size().unwrap();
-    let aa = 0;
+    let aa = window.get_pixel_format().multisampling as tex::NumSamples;
     (width as tex::Size, height as tex::Size, 1, aa.into())
 }
