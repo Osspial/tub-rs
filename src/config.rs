@@ -194,8 +194,8 @@ pub struct PixelFormat {
     pub multisampling: u16
 }
 
-unsafe impl Send for WindowConfig {}
-unsafe impl Sync for WindowConfig {}
+unsafe impl Send for PixelFormat {}
+unsafe impl Sync for PixelFormat {}
 
 impl PixelFormat {
     #[inline]
