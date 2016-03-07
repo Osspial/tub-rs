@@ -125,11 +125,11 @@ impl<'o> Window<'o> {
     }
 }
 
-pub struct GlContext<'w> ( wgl::GlContext<'w> );
+pub struct GlContext<'w, 'c> ( wgl::GlContext<'w, 'c> );
 
-impl<'w> GlContext<'w> {
-    pub fn new(window: &'w Window) -> TubResult<GlContext<'w>> {
-        unsafe{ mem::transmute(wgl::GlContext::new(&window.0)) }
+impl<'w, 'c> GlContext<'w, 'c> {
+    pub fn new(window: &'w Window, shared_context: Option<&'c GlContext>) -> TubResult<GlContext<'w, 'c>> {
+        unsafe{ mem::transmute(wgl::GlContext::new(&window.0, mem::transmute(shared_context))) }
     }
 
     pub unsafe fn make_current(&self) -> TubResult<()> {

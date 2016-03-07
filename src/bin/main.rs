@@ -20,7 +20,7 @@ fn main() {
             .icon(Some(Path::new("tub.ico").to_path_buf()))
             .size(Some((500, 500))),
         Default::default()).unwrap();
-    let window_context = platform::GlContext::new(&window).unwrap();
+    let window_context = platform::GlContext::new(&window, None).unwrap();
     unsafe{ window_context.make_current().unwrap() };
 
     let mut owned_window: Option<platform::Window> = None;
@@ -41,7 +41,7 @@ fn main() {
                             owned.owner().unwrap().disable();
                             owned.focus();
                             owned_window = Some(owned);
-                        },
+                        }
 
                         Some(_) => ()
                     }

@@ -21,18 +21,21 @@ use api::win32::wrapper::WindowWrapper;
 use error::{TubResult, TubError};
 use config::PixelFormat;
 
-pub struct GlContext<'w> {
+pub struct GlContext<'w, 'c> {
     hdc: HDC,
     /// A handle to the OpenGL context
     context: HGLRC,
     gl_library: HMODULE,
     /// Guarantees that this won't live longer than the window that created it, which would
     /// be very very bad.
-    phantom: PhantomData<&'w ()>
+    window_lifetime: PhantomData<&'w ()>,
+    /// Guarantees that this won't live longer than any context that this is sharing resources
+    /// with.
+    shared_lifetime: PhantomData<&'c ()>
 }
 
-impl<'w> GlContext<'w> {
-    pub fn new(window: &'w Window) -> TubResult<GlContext<'w>> {
+impl<'w, 'c> GlContext<'w, 'c> {
+    pub fn new(window: &'w Window, shared_context: Option<&'c GlContext>) -> TubResult<GlContext<'w, 'c>> {
         unsafe {
             // Gets the current hdc and gl context to restore after loading the context creation functions
             let (last_hdc, last_context) = (wgl::GetCurrentDC(), wgl::GetCurrentContext());
@@ -148,9 +151,14 @@ impl<'w> GlContext<'w> {
                                                     &mut format_count);
                     try!(set_pixel_format(hdc, format_num));
                     
+                    let shared_context_ptr = 
+                        match shared_context {
+                            Some(c) => c.context as *const c_void,
+                            None    => ptr::null()
+                        };
                     let context = 
                         wgl_ex_fns.CreateContextAttribsARB(hdc as *const _,
-                                                           ptr::null_mut(),
+                                                           shared_context_ptr,
                                                            ptr::null());
                     if context == ptr::null_mut() { return Err(TubError::ContextCreationError("Could not create OpenGL context".to_string())) }
 
@@ -170,7 +178,8 @@ impl<'w> GlContext<'w> {
                     hdc: hdc,
                     context: context as HGLRC,
                     gl_library: gl_library,
-                    phantom: PhantomData
+                    window_lifetime: PhantomData,
+                    shared_lifetime: PhantomData
                 }
             )
         }
@@ -193,7 +202,7 @@ impl<'w> GlContext<'w> {
     }
 }
 
-impl<'w> Drop for GlContext<'w> {
+impl<'w, 'c> Drop for GlContext<'w, 'c> {
     fn drop(&mut self) {
         unsafe {
             wgl::DeleteContext(self.context as *const _);
