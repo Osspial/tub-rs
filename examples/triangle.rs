@@ -123,8 +123,8 @@ where
     tub::platform::Window::new(window_config, pix_format).unwrap()
 }
 
-fn init_context<'w, Cf, Df>(window: &'w Window) -> 
-    (tub::platform::GlContext<'w>, gfx_device_gl::Device, 
+fn init_context<'w, 'c, Cf, Df>(window: &'w Window) -> 
+    (tub::platform::GlContext<'w, 'c>, gfx_device_gl::Device, 
     gfx_device_gl::Factory, handle::RenderTargetView<R, Cf>, 
     handle::DepthStencilView<R, Df>)
 where
@@ -135,7 +135,7 @@ where
 
     let color_format = Cf::get_format();
     let ds_format = Df::get_format();
-    let context = tub::platform::GlContext::new(window).unwrap();
+    let context = tub::platform::GlContext::new(window, None).unwrap();
 
     unsafe { context.make_current().unwrap() };
     let (device, factory) = gfx_device_gl::create(|s|

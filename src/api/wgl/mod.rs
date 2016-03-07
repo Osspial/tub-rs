@@ -37,8 +37,6 @@ pub struct GlContext<'w, 'c> {
 impl<'w, 'c> GlContext<'w, 'c> {
     pub fn new(window: &'w Window, shared_context: Option<&'c GlContext>) -> TubResult<GlContext<'w, 'c>> {
         unsafe {
-            // Gets the current hdc and gl context to restore after loading the context creation functions
-            let (last_hdc, last_context) = (wgl::GetCurrentDC(), wgl::GetCurrentContext());
             let hdc = window.wrapper.1;
 
             let (context, gl_library) = {
@@ -49,9 +47,10 @@ impl<'w, 'c> GlContext<'w, 'c> {
 
                 try!(set_pixel_format(d_hdc, try!(get_dummy_pixel_format(d_hdc, &pixel_format))));
 
-                // Create the dummy context
-                let d_context = wgl::CreateContext(d_hdc as *const c_void);
-                if d_context == ptr::null_mut() { return Err(TubError::OsError(format!("Dummy Context Creation Error: {}", OsErr::last_os_error()))) }
+                // Create the dummy context and make it current. If it cannot create the context or make it current,
+                // abort this function with an error.
+                let d_context = try!(DummyContext::new(d_hdc));
+                try!(d_context.make_current());
 
                 // Load the opengl library
                 let gl_library = {
@@ -62,11 +61,6 @@ impl<'w, 'c> GlContext<'w, 'c> {
 
                     library
                 };
-
-                // wglMakeCurrent requires an OpenGL context to be current, so this makes the newly created
-                // one the current one. After the function pointers have been loaded, the program resets the
-                // context to whatever it was previously.
-                wgl::MakeCurrent(d_hdc as *const _, d_context as *const _);
 
                 // Load the wgl functions that might not be defined
                 let wgl_ex_fns = wgl_ex::Wgl::load_with(|s| get_proc_address(gl_library, s) as *const _);
@@ -127,7 +121,6 @@ impl<'w, 'c> GlContext<'w, 'c> {
 
                     if pixel_format.multisampling > 0 {
                         if extns.contains("WGL_ARB_multisample") {
-                            println!("Enabling multisampling {}", pixel_format.multisampling);
                             attrs.push(wgl_ex::SAMPLE_BUFFERS_ARB);
                             attrs.push(1);
                             attrs.push(wgl_ex::SAMPLES_ARB);
@@ -170,9 +163,6 @@ impl<'w, 'c> GlContext<'w, 'c> {
             };
 
 
-            // Reset the context to what it was before loading the functions
-            wgl::MakeCurrent(last_hdc as *const _, last_context as *const _);
-
             Ok(
                 GlContext {
                     hdc: hdc,
@@ -205,6 +195,54 @@ impl<'w, 'c> GlContext<'w, 'c> {
 impl<'w, 'c> Drop for GlContext<'w, 'c> {
     fn drop(&mut self) {
         unsafe {
+            wgl::DeleteContext(self.context as *const _);
+        }
+    }
+}
+
+/// A wrapper around the dummy OpenGL context. Why, you ask, does this exist? Well, there are multiple
+/// instances where using the functions this context provides may fail, causing the actual OpenGL context
+/// creation function to return an Err. When that happens, certain cleanup must be done and it's easiest
+/// to wrap that cleanup in an RAII wrapper than it is to have a bit of boilerplate every time. That cleanup
+/// is to reset the context to the one created before the function was run and to delete this context.
+struct DummyContext {
+    hdc: HDC,
+    context: HGLRC,
+    last_hdc: HDC,
+    last_context: HGLRC
+}
+
+impl DummyContext {
+    fn new(hdc: HDC) -> TubResult<DummyContext> {
+        unsafe {
+            let context = wgl::CreateContext(hdc as *const c_void);
+            if context == ptr::null_mut() {
+                return Err(TubError::OsError(format!("Dummy Context Creation Error: {}", OsErr::last_os_error())));
+            }
+
+            Ok(
+                DummyContext {
+                    hdc: hdc,
+                    context: context as HGLRC,
+                    last_hdc: wgl::GetCurrentDC() as HDC,
+                    last_context: wgl::GetCurrentContext() as HGLRC
+                }
+            )
+        }
+    }
+
+    unsafe fn make_current(&self) -> TubResult<()> {
+        match wgl::MakeCurrent(self.hdc as *const c_void, self.context as *const c_void) {
+            0 => Err(TubError::OsError(format!("Dummy Context Switch Error: {}", OsErr::last_os_error()))),
+            _ => Ok(())
+        }
+    }
+}
+
+impl Drop for DummyContext {
+    fn drop(&mut self) {
+        unsafe {
+            wgl::MakeCurrent(self.last_hdc as *const _, self.last_context as *const _);
             wgl::DeleteContext(self.context as *const _);
         }
     }
