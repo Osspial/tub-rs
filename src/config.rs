@@ -185,14 +185,25 @@ pub enum InitialState {
 /// the WindowConfig documentation for how and when to use the methods
 #[derive(Debug, Clone)]
 pub struct PixelFormat {
+    /// The minimum number of color bits in the framebuffer. Defaults to 24.
     pub color_bits: u8,
+    /// The minimum number of alpha bits in the framebuffer. Defaults to 8.
     pub alpha_bits: u8,
+    /// The minimum size of the depth buffer. Defaults to 0.
     pub depth_bits: u8,
+    /// The minimum size of the stencil buffer. Defaults to 0.
     pub stencil_bits: u8,
+    /// Whether or not the window should use SRGB. None is don't care, defaults to None.
     pub srgb: Option<bool>,
+    /// Whether or not the window should have a floating-point color buffer. Defaults to false.
     pub color_buffer_float: bool,
+    /// The minimum amount of multisampling for the window. Defaults to 0
     pub multisampling: u16,
-    pub hardware_accel: Option<bool>
+    /// Whether or not the window should produce a hardware accelerated pixel format. None
+    /// is don't care, defaults to Some(true)
+    pub hardware_accel: Option<bool>,
+    /// Whether or not the window should have a left and right color buffer. Defaults to false.
+    pub stereoscopic: bool
 }
 
 unsafe impl Send for PixelFormat {}
@@ -211,6 +222,7 @@ impl PixelFormat {
     }
 
     #[inline]
+    /// Part of a healthy and balanced breakfast
     pub fn alpha_bits(mut self, alpha_bits: u8) -> PixelFormat {
         self.alpha_bits = alpha_bits;
         self
@@ -251,19 +263,26 @@ impl PixelFormat {
         self.hardware_accel = hardware_accel;
         self
     }
+
+    #[inline]
+    pub fn stereoscopic(mut self, stereoscopic: bool) -> PixelFormat {
+        self.stereoscopic = stereoscopic;
+        self
+    }
 }
 
 impl Default for PixelFormat {
     fn default() -> PixelFormat {
         PixelFormat {
-            color_bits: 32,
+            color_bits: 24,
             alpha_bits: 8,
             depth_bits: 0,
             stencil_bits: 0,
             srgb: None,
             color_buffer_float: false,
             multisampling: 0,
-            hardware_accel: Some(true)
+            hardware_accel: Some(true),
+            stereoscopic: false
         }
     }
 }

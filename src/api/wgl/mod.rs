@@ -133,6 +133,11 @@ impl<'w, 'c> GlContext<'w, 'c> {
                         }
                     }
 
+                    if pixel_format.stereoscopic {
+                        attrs.push(wgl_ex::STEREO_ARB);
+                        attrs.push(1);
+                    }
+
                     if let Some(accel) = pixel_format.hardware_accel {
                         attrs.push(wgl_ex::ACCELERATION_ARB);
                         match accel {
