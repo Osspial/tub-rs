@@ -18,7 +18,7 @@ use self::gl::wgl_ex;
 use api::osstr;
 use api::win32::Window;
 use api::win32::wrapper::WindowWrapper;
-use error::{TubResult, TubError};
+use error::{TubResult, TubError, GlCreationError, GlCreationResult};
 use config::PixelFormat;
 
 pub struct GlContext<'w, 'c> {
@@ -35,14 +35,16 @@ pub struct GlContext<'w, 'c> {
 }
 
 impl<'w, 'c> GlContext<'w, 'c> {
-    pub fn new(window: &'w Window, shared_context: Option<&'c GlContext>) -> TubResult<GlContext<'w, 'c>> {
+    pub fn new(window: &'w Window, shared_context: Option<&'c GlContext>) -> GlCreationResult<GlContext<'w, 'c>> {
         unsafe {
             let hdc = window.wrapper.1;
 
             let (context, gl_library) = {
                 let pixel_format = window.get_pixel_format();
 
-                let dummy_window = try!(WindowWrapper::new(window.get_config(), None));
+                // Create the dummy window. We can unwrap because, if we've gotten this far, the config
+                // shouldn't cause any errors.
+                let dummy_window = WindowWrapper::new(window.get_config(), None).unwrap();
                 let d_hdc = dummy_window.1;
 
                 try!(set_pixel_format(d_hdc, try!(get_dummy_pixel_format(d_hdc, &pixel_format))));
@@ -57,7 +59,7 @@ impl<'w, 'c> GlContext<'w, 'c> {
                     let name = osstr("opengl32.dll");
                     let library = kernel32::LoadLibraryW(name.as_ptr());
 
-                    if library == ptr::null_mut() { return Err(TubError::OsError(format!("opengl32.dll Load Error: {}", OsErr::last_os_error()))) }
+                    if library == ptr::null_mut() { return Err(GlCreationError::OsError(OsErr::last_os_error().to_string(), "Could not load opengl32.dll".to_owned())) }
 
                     library
                 };
@@ -98,7 +100,7 @@ impl<'w, 'c> GlContext<'w, 'c> {
                             attrs.push(1);
                         }
                         else {
-                            return Err(TubError::ContextCreationError("Could not create floating-point color buffer".to_string()));
+                            return Err(GlCreationError::FloatingBufferError);
                         }
                     }
 
@@ -110,7 +112,7 @@ impl<'w, 'c> GlContext<'w, 'c> {
                             attrs.push(wgl_ex::FRAMEBUFFER_SRGB_CAPABLE_EXT);
                         }
                         else {
-                            return Err(TubError::ContextCreationError("Could not create SRGB pixel format".to_string()));
+                            return Err(GlCreationError::SRGBBufferError);
                         }
 
                         match srgb {
@@ -127,7 +129,15 @@ impl<'w, 'c> GlContext<'w, 'c> {
                             attrs.push(pixel_format.multisampling as u32);
                         }
                         else {
-                            return Err(TubError::ContextCreationError("Could not create multisampled pixel format".to_owned()));
+                            return Err(GlCreationError::MSAABufferError);
+                        }
+                    }
+
+                    if let Some(accel) = pixel_format.hardware_accel {
+                        attrs.push(wgl_ex::ACCELERATION_ARB);
+                        match accel {
+                            true  => attrs.push(wgl_ex::FULL_ACCELERATION_ARB),
+                            false => attrs.push(wgl_ex::NO_ACCELERATION_ARB)
                         }
                     }
 
@@ -153,12 +163,12 @@ impl<'w, 'c> GlContext<'w, 'c> {
                         wgl_ex_fns.CreateContextAttribsARB(hdc as *const _,
                                                            shared_context_ptr,
                                                            ptr::null());
-                    if context == ptr::null_mut() { return Err(TubError::ContextCreationError("Could not create OpenGL context".to_string())) }
+                    if context == ptr::null_mut() { return Err(GlCreationError::ExtendedCreationError) }
 
                     (context, gl_library)
                 }
                 else {
-                    return Err(TubError::ContextCreationError("Could not load extended OpenGL context creation functions".to_string()));
+                    return Err(GlCreationError::FunctionLoadError);
                 }
             };
 
@@ -178,7 +188,7 @@ impl<'w, 'c> GlContext<'w, 'c> {
 
     pub unsafe fn make_current(&self) -> TubResult<()> {
         if wgl::MakeCurrent(self.hdc as *const c_void, self.context as *const c_void) == 0 {
-            return Err(TubError::OsError(format!("Context Switch Error: {}", OsErr::last_os_error())));
+            return Err(TubError::OsError(format!("Context Switch Error: {}", OsErr::last_os_error().to_string())));
         }
         Ok(())
     }
@@ -213,11 +223,11 @@ struct DummyContext {
 }
 
 impl DummyContext {
-    fn new(hdc: HDC) -> TubResult<DummyContext> {
+    fn new(hdc: HDC) -> GlCreationResult<DummyContext> {
         unsafe {
             let context = wgl::CreateContext(hdc as *const c_void);
             if context == ptr::null_mut() {
-                return Err(TubError::OsError(format!("Dummy Context Creation Error: {}", OsErr::last_os_error())));
+                return Err(GlCreationError::OsError(OsErr::last_os_error().to_string(), "Could not create dummy context".to_owned()));
             }
 
             Ok(
@@ -231,9 +241,9 @@ impl DummyContext {
         }
     }
 
-    unsafe fn make_current(&self) -> TubResult<()> {
+    unsafe fn make_current(&self) -> GlCreationResult<()> {
         match wgl::MakeCurrent(self.hdc as *const c_void, self.context as *const c_void) {
-            0 => Err(TubError::OsError(format!("Dummy Context Switch Error: {}", OsErr::last_os_error()))),
+            0 => Err(GlCreationError::OsError(OsErr::last_os_error().to_string(), "Could not make dummy context current".to_owned())),
             _ => Ok(())
         }
     }
@@ -265,7 +275,7 @@ fn get_proc_address(library: HMODULE, proc_name: &str) -> *const () {
     }
 }
 
-unsafe fn get_dummy_pixel_format(hdc: HDC, pixel_format: &PixelFormat) -> TubResult<i32> {
+unsafe fn get_dummy_pixel_format(hdc: HDC, pixel_format: &PixelFormat) -> GlCreationResult<i32> {
     let mut pfd: winapi::PIXELFORMATDESCRIPTOR = mem::zeroed();
     pfd.nSize = mem::size_of::<winapi::PIXELFORMATDESCRIPTOR>() as winapi::WORD;
     pfd.nVersion = 1;
@@ -278,26 +288,26 @@ unsafe fn get_dummy_pixel_format(hdc: HDC, pixel_format: &PixelFormat) -> TubRes
     pfd.iLayerType = winapi::PFD_MAIN_PLANE;
 
     match gdi32::ChoosePixelFormat(hdc, &pfd) {
-        0 => Err(TubError::OsError(format!("Could not get Dummy Pixel Format: {}", OsErr::last_os_error()))),
+        0 => Err(GlCreationError::OsError(OsErr::last_os_error().to_string(), "Could not get Dummy Pixel Format: {}".to_owned())),
         f => Ok(f)
     }
 }
 
 /// Creates a pixel format for the dummy window, selectively taking relevant parts of the
 /// pixel format to make one that resembles the actual format as closely as possible. 
-unsafe fn set_pixel_format(hdc: HDC, format_num: i32) -> TubResult<()> {
+unsafe fn set_pixel_format(hdc: HDC, format_num: i32) -> GlCreationResult<()> {
     let mut pfd = mem::zeroed();
     let pfd_size = mem::size_of::<winapi::PIXELFORMATDESCRIPTOR>() as u32;
 
     // Get the pixel format description and put it into the PFD struct. If it fails (which it really, 
     // REALLY shouldn't), return an error.
     if gdi32::DescribePixelFormat(hdc, format_num, pfd_size, &mut pfd) == 0 {
-        return Err(TubError::OsError(format!("Indescribable Pixel Format (how? I don't know, something must have gone really wrong): {}", OsErr::last_os_error())));
+        return Err(GlCreationError::IndescribableFormatError(OsErr::last_os_error().to_string()));
     }
 
 
     match gdi32::SetPixelFormat(hdc, format_num, &pfd) {
-        0 => Err(TubError::OsError(format!("Dummy Pixel Format Error: {}", OsErr::last_os_error()))),
+        0 => Err(GlCreationError::OsError(OsErr::last_os_error().to_string(), "Could not set window pixel format".to_owned())),
         1 => Ok(()),
         _ => unreachable!()
     }

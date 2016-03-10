@@ -191,7 +191,8 @@ pub struct PixelFormat {
     pub stencil_bits: u8,
     pub srgb: Option<bool>,
     pub color_buffer_float: bool,
-    pub multisampling: u16
+    pub multisampling: u16,
+    pub hardware_accel: Option<bool>
 }
 
 unsafe impl Send for PixelFormat {}
@@ -244,6 +245,12 @@ impl PixelFormat {
         self.multisampling = multisampling;
         self
     }
+
+    #[inline]
+    pub fn hardware_accel(mut self, hardware_accel: Option<bool>) -> PixelFormat {
+        self.hardware_accel = hardware_accel;
+        self
+    }
 }
 
 impl Default for PixelFormat {
@@ -255,7 +262,8 @@ impl Default for PixelFormat {
             stencil_bits: 0,
             srgb: None,
             color_buffer_float: false,
-            multisampling: 0
+            multisampling: 0,
+            hardware_accel: Some(true)
         }
     }
 }

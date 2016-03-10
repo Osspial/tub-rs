@@ -2,7 +2,7 @@ use std::mem;
 
 use api::win32;
 use api::wgl;
-use error::TubResult;
+use error::{TubResult, GlCreationResult};
 use config::{WindowConfig, PixelFormat};
 use CursorType;
 
@@ -128,7 +128,7 @@ impl<'o> Window<'o> {
 pub struct GlContext<'w, 'c> ( wgl::GlContext<'w, 'c> );
 
 impl<'w, 'c> GlContext<'w, 'c> {
-    pub fn new(window: &'w Window, shared_context: Option<&'c GlContext>) -> TubResult<GlContext<'w, 'c>> {
+    pub fn new(window: &'w Window, shared_context: Option<&'c GlContext>) -> GlCreationResult<GlContext<'w, 'c>> {
         unsafe{ mem::transmute(wgl::GlContext::new(&window.0, mem::transmute(shared_context))) }
     }
 
