@@ -4,19 +4,23 @@ use api::win32;
 use api::wgl;
 use error::{TubResult, GlCreationResult};
 use config::{WindowConfig, PixelFormat};
-use CursorType;
+use {CursorType, WindowType};
 
-pub struct Window<'o>( win32::Window<'o> );
+pub struct Window<'p>( win32::Window<'p> );
 
-impl<'o> Window<'o> {
-    pub fn new<'a>(config: WindowConfig, pixel_format: PixelFormat) -> TubResult<Window<'o>> {
+impl<'p> Window<'p> {
+    pub fn new<'a>(config: WindowConfig, pixel_format: PixelFormat) -> TubResult<Window<'p>> {
         // Because this struct is just a bitwise-equivalent wrapper around a win32 window, we can
         // just transmute the reference to the result.
         unsafe{ mem::transmute(win32::Window::new(config, pixel_format)) }
     }
 
-    pub fn new_owned<'a>(&'o self, config: WindowConfig, pixel_format: PixelFormat) -> TubResult<Window<'o>> {
+    pub fn new_owned<'a>(&'p self, config: WindowConfig, pixel_format: PixelFormat) -> TubResult<Window<'p>> {
         unsafe{ mem::transmute(self.0.new_owned(config, pixel_format)) }
+    }
+
+    pub fn new_child<'a>(&'p self, config: WindowConfig, pixel_format: PixelFormat) -> TubResult<Window<'p>> {
+        unsafe{ mem::transmute(self.0.new_child(config, pixel_format)) }
     }
 
     #[inline]
@@ -100,8 +104,16 @@ impl<'o> Window<'o> {
     }
 
     #[inline]
-    pub fn owner(&self) -> Option<&Window> {
-        unsafe{ mem::transmute(self.0.owner()) }
+    pub fn get_type(&self) -> WindowType {
+        use api::win32::WindowType::*;
+
+        unsafe {
+            match self.0.get_type() {
+                Owned(w) => WindowType::Owned(mem::transmute(w)),
+                Child(w) => WindowType::Child(mem::transmute(w)),
+                Top      => WindowType::Top
+            }
+        }
     }
 
     #[inline]

@@ -31,7 +31,7 @@ unsafe impl Sync for WindowWrapper {}
 
 impl WindowWrapper {
     #[inline]
-    pub fn new<'a>(config: &WindowConfig, owner: Option<HWND>) -> TubResult<WindowWrapper> {
+    pub fn new<'a>(config: &WindowConfig, owner: HwndType) -> TubResult<WindowWrapper> {
         unsafe {
             let class_name = register_window_class();
 
@@ -42,6 +42,10 @@ impl WindowWrapper {
 
                 let mut style = winapi::WS_SYSMENU;
                 let mut style_ex = 0;
+
+                if let HwndType::Child(_) = owner {
+                    style |= winapi::WS_CHILD;
+                }
 
                 if !config.borderless && !config.tool_window {
                     style |= winapi::WS_CAPTION;
@@ -477,8 +481,27 @@ impl WindowDataIntern {
 
 pub struct WindowData( pub WindowWrapper, pub Receiver<Event> );
 
+pub enum HwndType {
+    Owned(HWND),
+    Child(HWND),
+    Top
+}
+
+impl HwndType {
+    fn unwrap_or(self, def: HWND) -> HWND {
+        use self::HwndType::*;
+
+        match self {
+            Owned(hw) |
+            Child(hw)   => hw,
+            Top         => def
+        }
+    }
+}
+
 
 pub const MSG_NEWOWNEDWINDOW: UINT = 0xADD;
+pub const MSG_NEWCHILDWINDOW: UINT = 0xADDC;
 pub const MSG_GAINFOCUS: UINT = 71913;
 pub const MSG_SETCURSOR: UINT = 32118;
 pub const MSG_ISACTIVEWIN: UINT = 0xAC20;
@@ -535,7 +558,7 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
         }
 
         winapi::WM_SETCURSOR=> {
-            CALLBACK_DATA.with(|data| {
+            let ok = CALLBACK_DATA.with(|data| {
                 let mut data = data.borrow_mut();
                 let (index, data) = match *data {
                     Some(ref mut d) => (d.get_window_index(hwnd) as usize, d),
@@ -547,9 +570,14 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
                     0
                 }
                 else {
-                    user32::DefWindowProcW(hwnd, msg, wparam, lparam)
+                    2
                 }
-            })
+            });
+
+            match ok {
+                2 => user32::DefWindowProcW(hwnd, msg, wparam, lparam),
+                _ => ok
+            }
         }
 
         winapi::WM_LBUTTONDOWN  => {
@@ -674,7 +702,6 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
 
         winapi::WM_MOUSEMOVE    => {
             CALLBACK_DATA.with(|data| {
-                
                 let mpos = {
                     let mut data = data.borrow_mut();
                     match *data {
@@ -780,15 +807,22 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
             0
         }
 
-        MSG_NEWOWNEDWINDOW  => {
+        MSG_NEWOWNEDWINDOW |
+        MSG_NEWCHILDWINDOW  => {
             use std::sync::mpsc;
 
             // For this message, the pointer to the window config is stored in the
             // LPARAM parameter. This turns them into proper pointers
             // and gets the objects from the pointers.
-            let config  = &*(lparam as *const WindowConfig);
+            let config = &*(lparam as *const WindowConfig);
+            let parent_hwnd = match msg {
+                MSG_NEWOWNEDWINDOW => HwndType::Owned(hwnd),
+                MSG_NEWCHILDWINDOW => HwndType::Child(hwnd),
+                _ => unreachable!()
+            };
 
-            let wrapper_window = WindowWrapper::new(config, Some(hwnd));
+            let wrapper_window = WindowWrapper::new(config, parent_hwnd);
+            // The window's event sender/reciever pair
             let (tx, rx) = mpsc::channel();
 
             CALLBACK_DATA.with(move |data| {
@@ -815,7 +849,7 @@ unsafe extern "system" fn callback(hwnd: HWND, msg: UINT,
             0
         }
 
-        MSG_ISACTIVEWIN => {
+        MSG_ISACTIVEWIN     => {
             if hwnd == user32::GetActiveWindow() {
                 *(wparam as *mut bool) = true;
             }

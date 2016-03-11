@@ -17,7 +17,7 @@ use self::gl::wgl;
 use self::gl::wgl_ex;
 use api::osstr;
 use api::win32::Window;
-use api::win32::wrapper::WindowWrapper;
+use api::win32::wrapper::{WindowWrapper, HwndType};
 use error::{TubResult, TubError, GlCreationError, GlCreationResult};
 use config::PixelFormat;
 
@@ -44,7 +44,7 @@ impl<'w, 'c> GlContext<'w, 'c> {
 
                 // Create the dummy window. We can unwrap because, if we've gotten this far, the config
                 // shouldn't cause any errors.
-                let dummy_window = WindowWrapper::new(window.get_config(), None).unwrap();
+                let dummy_window = WindowWrapper::new(window.get_config(), HwndType::Top).unwrap();
                 let d_hdc = dummy_window.1;
 
                 try!(set_pixel_format(d_hdc, try!(get_dummy_pixel_format(d_hdc, &pixel_format))));

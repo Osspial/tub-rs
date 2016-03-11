@@ -18,16 +18,22 @@ fn main() {
         WindowConfig::new()
             .name("It's a window!".to_owned())
             .icon(Some(Path::new("tub.ico").to_path_buf()))
-            .size(Some((500, 500))),
+            .size(Some((1280, 720))),
         Default::default()).unwrap();
     let window_context = platform::GlContext::new(&window, None).unwrap();
     unsafe{ window_context.make_current().unwrap() };
 
     let mut owned_window: Option<platform::Window> = None;
-
     let mut reset_owned = false;
 
+    let child_window = window.new_child(
+        WindowConfig::new()
+            .name("Child Window".to_owned())
+            .size(Some((500, 500))),
+        Default::default()).unwrap();
+
     window.show();
+    child_window.show();
     window.focus();
     loop {
         for event in window.poll_events() {
@@ -38,7 +44,7 @@ fn main() {
                         None    => { 
                             let owned = window.new_owned(owned_config.clone(), Default::default()).unwrap();
                             owned.show();
-                            owned.owner().unwrap().disable();
+                            owned.get_type().unwrap().disable();
                             owned.focus();
                             owned_window = Some(owned);
                         }
@@ -83,8 +89,8 @@ fn main() {
                     }
 
                     Event::Closed   => {
-                        owned.owner().unwrap().enable();
-                        owned.owner().unwrap().focus();
+                        owned.get_type().unwrap().enable();
+                        owned.get_type().unwrap().focus();
                         reset_owned = true;
                     }
 

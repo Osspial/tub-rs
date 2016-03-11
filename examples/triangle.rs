@@ -29,7 +29,6 @@ fn main() {
             .borderless(false),
         tub::config::PixelFormat::new()
             .multisampling(16)
-            .stereoscopic(true)
         );
 
     let (context, mut device, mut factory, main_color, _) =
