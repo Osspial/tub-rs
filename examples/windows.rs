@@ -1,4 +1,3 @@
-
 extern crate tub;
 
 use tub::platform;
@@ -33,11 +32,11 @@ fn main() {
         Default::default()).unwrap();
 
     window.show();
-    child_window.show();
     window.focus();
+    child_window.show();
     loop {
         for event in window.poll_events() {
-            //println!("{:?}", event);
+            println!("parent: {:?}", event);
             match event {
                 Event::KeyInput(PressState::Pressed, VKeyCode::D)   => {
                     match owned_window {
@@ -83,6 +82,7 @@ fn main() {
 
         if let Some(ref owned) = owned_window {
             for event in owned.poll_events() {
+                println!("owned: {:?}", event);
                 match event {
                     Event::KeyInput(PressState::Pressed, VKeyCode::E)   => {
                         owned.set_cursor(tub::CursorType::Crosshair);
@@ -98,6 +98,10 @@ fn main() {
                 }
                 
             }
+        }
+
+        for event in child_window.poll_events() {
+            println!("child: {:?}", event);
         }
 
         if reset_owned {
